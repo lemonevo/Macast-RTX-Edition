@@ -1,58 +1,87 @@
-# Macast RTX Edition
+# 📺 Macast RTX Edition
 
+[![Latest release](https://img.shields.io/github/v/release/ccjjxx99/Macast-RTX-Edition?display_name=tag&sort=semver)](https://github.com/ccjjxx99/Macast-RTX-Edition/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/ccjjxx99/Macast-RTX-Edition/total)](https://github.com/ccjjxx99/Macast-RTX-Edition/releases)
 [![Build Windows](https://github.com/ccjjxx99/Macast-RTX-Edition/actions/workflows/build-windows.yml/badge.svg)](https://github.com/ccjjxx99/Macast-RTX-Edition/actions/workflows/build-windows.yml)
 [![GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-76b900)](LICENSE)
 [![mpv 0.41.0](https://img.shields.io/badge/mpv-0.41.0-76b900)](https://github.com/mpv-player/mpv/releases/tag/v0.41.0)
 
-Macast RTX Edition 是 [xfangfang/Macast](https://github.com/xfangfang/Macast) 的 Windows 增强版：保留轻量的 DLNA/UPnP Media Renderer，用新版 mpv 接收 OK影视、TVBox 等应用的投屏，并接入 NVIDIA RTX Video Super Resolution（VSR）与 RTX Video HDR。
+Macast RTX Edition 是一款面向 Windows 的轻量级 DLNA/UPnP 媒体接收器。它让电脑出现在局域网的投放设备列表中，接收来自手机、平板、电脑、家庭服务器及其他 DLNA 控制端的视频、音乐和图片，并交给内置的 mpv 播放。
 
-当前版本：`1.0.0`。项目名称使用正确拼写 `Macast-RTX-Edition`。
+程序常驻系统托盘，不需要媒体库、账号或内容服务。支持 NVIDIA RTX 的电脑还可以直接启用 RTX Video Super Resolution 和 RTX Video HDR。
 
-## 主要变化
+[下载最新版](https://github.com/ccjjxx99/Macast-RTX-Edition/releases/latest) · [查看源码](https://github.com/ccjjxx99/Macast-RTX-Edition) · [报告问题](https://github.com/ccjjxx99/Macast-RTX-Edition/issues) · [安全策略](SECURITY.md)
 
-- 内置 mpv `0.41.0` 官方 Windows MSVC 构建，替换上游 2022 年使用的 mpv `0.34.0`。
-- 托盘菜单可分别启用 RTX VSR 与 RTX Video HDR。
-- VSR 会根据源视频与当前输出区域自动选择 `1.05x`～`4x` 倍率，只处理不高于 1440p、且确实发生放大的视频，避免把原生 4K 固定放大到 8K。
-- RTX 模式明确使用 `gpu-next + D3D11 + d3d11va + d3d11vpp`，由 NVIDIA 驱动完成 VSR/HDR 处理。
-- Python 运行与构建依赖已锁定到当前维护版本；`netifaces` 更换为兼容导入名的维护分支 `netifaces-plus`，`appdirs` 更换为 `platformdirs`。
-- 移除旧管理页对 Vue 2、Vue Resource、Element UI 和远程字体的运行依赖，改为无框架、本地静态页面。
-- 管理接口仅允许本机回环地址访问，并增加 CSRF 校验；旧版从局域网远程下载并执行插件的入口已移除。
-- LAN 输入的 XML 禁止实体解析、DTD 与网络访问；UPnP 事件回调限制到发起订阅的控制端地址。
-- Windows 构建流程使用固定提交的 GitHub Actions、固定 mpv 下载地址和 SHA-256 校验。
+## ✨ 核心功能
 
-## 运行条件
+### 📡 DLNA 媒体接收
 
-- Windows 10/11 64 位。
-- NVIDIA GeForce RTX 20 系列或更新显卡；RTX 50 系列受 NVIDIA RTX Video SDK 1.1 支持。
-- 较新的 NVIDIA Game Ready 或 Studio 驱动。
-- RTX Video HDR 还需要 HDR 显示器，并在 Windows“设置 → 系统 → 显示 → HDR”中打开 HDR。
-- 手机与电脑处于同一局域网，路由器未启用 AP/客户端隔离。
+- 在局域网中注册为标准 DLNA/UPnP Media Renderer。
+- 接收常见 DLNA 控制端发送的网络视频、音频、图片及本地媒体地址。
+- 支持播放、暂停、停止、音量调节和进度跳转等远程控制指令。
+- 电脑根据收到的地址读取媒体，不需要逐帧镜像控制端屏幕；如果控制端同时提供文件或代理服务，它仍需保持在线。
 
-非 RTX 电脑仍可把它当作普通 Macast 使用，但应在托盘菜单中关闭两个 RTX 选项。
+### 🎬 mpv 播放内核
 
-## 安装与投屏
+- 内置 mpv `0.41.0` 官方 Windows 64 位版本。
+- 支持硬件解码、全屏、窗口置顶和播放位置记忆。
+- 可以设置窗口尺寸与屏幕位置。
+- 可从托盘菜单复制当前媒体地址，方便调试或交给其他播放器。
+- 支持用户自己的 mpv 配置和脚本。
 
-1. 从 [Releases](https://github.com/ccjjxx99/Macast-RTX-Edition/releases) 下载 `Macast-RTX-Edition-v1.0.0.exe`。
-2. 启动程序；Windows 防火墙询问时，只允许“专用网络”。
-3. 在系统托盘中找到 Macast RTX Edition。
-4. 打开 OK影视或 TVBox 的投屏列表，选择名称中带有 `Macast RTX` 的设备。
-5. 在托盘菜单的 `NVIDIA RTX Video` 分组中切换：
-   - `RTX Video Super Resolution`
-   - `RTX Video HDR`
-6. 打开 NVIDIA App 的“系统 → 视频”，确认相应功能显示为活动状态。
+### 🟢 NVIDIA RTX Video
 
-RTX VSR 默认开启；RTX Video HDR 默认关闭。HDR 开启后，mpv 会把 SDR 内容交给 NVIDIA RTX Video HDR，原生 HDR 内容由驱动自动跳过转换。
+- RTX Video Super Resolution（VSR）与 RTX Video HDR 可以分别开关。
+- VSR 根据视频尺寸和播放窗口自动计算放大倍率，只在视频确实被放大时启用。
+- 默认处理最高 1440p 的输入，放大倍率限制在 `1.05x`～`4x`。
+- 使用 `gpu-next`、D3D11、`d3d11va` 和 `d3d11vpp` 接入 NVIDIA 视频处理链路。
+- 原生 HDR 视频不会再次执行 SDR 转 HDR。
 
-## 设置与日志
+### 🧩 托盘与本地设置
 
-托盘菜单中的“Advanced Setting”会打开本机管理页。页面提供：
+- 启停 DLNA 服务、开机启动和自动检查更新。
+- 切换 Renderer、Protocol、硬件解码、窗口大小、窗口位置与置顶状态。
+- 本地设置页可查看组件信息、编辑高级配置和读取运行日志。
+- 无框架设置页面，全部资源随程序本地提供，不依赖 CDN。
 
-- 当前本地 Renderer/Protocol 组件；
-- JSON 高级设置；
-- 运行日志；
-- RTX 使用条件与投屏排障提示。
+## 🔄 工作方式
 
-管理页和相关 API 只接受来自 `127.0.0.1` 或 `::1` 的请求。自定义 Renderer/Protocol 仍可放入配置目录，但插件是与主程序同权限运行的 Python 代码，只应使用自己审查过的文件。
+```mermaid
+flowchart LR
+    A["DLNA 控制端<br/>手机、平板、电脑、家庭服务器"] -->|媒体地址与播放指令| B["Macast RTX Edition"]
+    B --> C["mpv 0.41.0"]
+    C --> D["硬件解码与 RTX Video"]
+    D --> E["Windows 显示器或音频设备"]
+```
+
+Macast RTX Edition 是接收端，不是屏幕镜像工具。控制端发送媒体地址和播放指令，电脑负责连接媒体服务器并完成解码、渲染和声音输出。
+
+## 🚀 安装
+
+1. 打开 [Releases](https://github.com/ccjjxx99/Macast-RTX-Edition/releases/latest)，下载最新的 `Macast-RTX-Edition-v*.exe`。
+2. 运行程序。Windows 防火墙首次询问时，允许它访问专用网络。
+3. 确保控制端和电脑处于同一局域网。
+4. 在 DLNA 控制端的设备列表中选择名称带有 `Macast RTX` 的设备。
+5. 播放窗口会在收到媒体后自动打开，其他选项可在系统托盘中调整。
+
+程序是单文件版本，无需安装。退出程序后不会继续提供 DLNA 接收服务。
+
+## 🟢 RTX 设置
+
+RTX VSR 默认开启，RTX Video HDR 默认关闭。普通显卡或核显也能使用 DLNA 接收和 mpv 播放，只需在托盘菜单中关闭 RTX 选项。
+
+启用 RTX 功能需要：
+
+- Windows 10/11 64 位；
+- NVIDIA GeForce RTX 显卡和较新的 Game Ready 或 Studio 驱动；
+- RTX Video HDR 需要 HDR 显示器，并在 Windows 显示设置中打开 HDR；
+- 播放内容需要满足 NVIDIA 驱动的 RTX Video 处理条件。
+
+可以在 NVIDIA App 的“系统 → 视频”页面查看 VSR 和 HDR 是否处于活动状态。功能未激活时，先确认播放窗口正在放大视频、mpv 使用的是 NVIDIA 显卡，并检查驱动中的视频增强开关。
+
+## ⚙️ 设置与数据
+
+托盘菜单中的 `Advanced Setting` 会打开本机设置页。页面和相关 API 仅接受来自 `127.0.0.1` 或 `::1` 的请求。
 
 Windows 配置目录：
 
@@ -60,14 +89,52 @@ Windows 配置目录：
 %LOCALAPPDATA%\ccjjxx99\Macast-RTX-Edition
 ```
 
-## 从源码构建
+该目录保存高级设置、用户脚本和运行日志。自定义 Renderer、Protocol 或 mpv 脚本会以当前用户权限运行，只应加载自己信任的代码。
 
-推荐 Python 3.12。构建脚本不会清理或覆盖既有目录；目标路径已经存在时会直接停止，请为下一次构建指定新目录。
+## 🔒 安全与隐私
+
+- 不需要账号，不上传媒体库或播放记录。
+- 管理接口仅限本机访问，并使用 CSRF 校验。
+- 局域网输入的 XML 禁止实体解析、DTD 和外部网络访问。
+- UPnP 事件回调被限制到发起订阅的设备地址。
+- 构建流程固定 GitHub Actions 提交和 mpv 下载校验值。
+- Python 依赖由 `pip-audit` 在每次 GitHub Actions 构建时检查。
+
+投放时，电脑需要直接访问控制端提供的媒体地址。地址、请求权限或网络路由不可用时，播放器可能无法打开内容；部分媒体服务器也会限制进度跳转或临时链接的有效时间。
+
+## 常见问题
+
+<details>
+<summary>设备列表中找不到 Macast RTX Edition</summary>
+
+- 确认程序仍在系统托盘运行。
+- 将 Windows 网络类型设为“专用网络”，并允许程序通过专用网络防火墙。
+- 确认两台设备处于同一局域网，且路由器没有开启 AP 隔离、客户端隔离或访客网络。
+- VPN、多网卡和虚拟网卡可能影响 SSDP 广播，可暂时切换到实际使用的局域网接口排查。
+
+</details>
+
+<details>
+<summary>视频能播放，但不能拖动进度</summary>
+
+进度跳转需要媒体服务器、传输协议和控制端共同支持。可以先用 mpv 键盘快捷键测试，再更换媒体地址或线路。直播流、临时代理地址以及缺少时间索引的媒体可能无法跳转。
+
+</details>
+
+<details>
+<summary>RTX VSR 或 HDR 没有激活</summary>
+
+确认 NVIDIA App 已打开对应功能。VSR 只在视频发生放大时启用；HDR 还需要 Windows HDR 已开启。笔记本用户应确认播放进程运行在 NVIDIA 独立显卡上。
+
+</details>
+
+## 🧰 从源码构建
+
+Windows 构建推荐使用 Python 3.12。脚本不会覆盖已经存在的输出目录；重复构建时请指定新的 `OutputRoot`。
 
 ```powershell
 py -3.12 -m venv .venv-rtx
 .\.venv-rtx\Scripts\python.exe -m pip install -r requirements\build-windows.txt
-.\scripts\fetch_mpv.ps1
 .\scripts\build_windows.ps1 -Python .\.venv-rtx\Scripts\python.exe
 ```
 
@@ -78,126 +145,30 @@ py -3.12 -m venv .venv-rtx
 .build\windows-v1.0.0\dist\SHA256SUMS.txt
 ```
 
-`fetch_mpv.ps1` 只接受下面这个官方资源：
+构建脚本下载官方 mpv `0.41.0` Windows MSVC 包，并核对固定的 SHA-256：
 
 ```text
-https://github.com/mpv-player/mpv/releases/download/v0.41.0/mpv-v0.41.0-x86_64-pc-windows-msvc.zip
-SHA256: 4E197F729F5071C6772F35FFFD96E0F36E3E8A044BD9479B136BB09B7C6A80FF
+4E197F729F5071C6772F35FFFD96E0F36E3E8A044BD9479B136BB09B7C6A80FF
 ```
 
-依赖审计：
+手动执行依赖审计：
 
 ```powershell
 .\.venv-rtx\Scripts\python.exe -m pip_audit -r requirements\windows.txt
 ```
 
-GitHub Actions 会在每次提交和 Pull Request 上重新执行依赖审计与 Windows 构建；推送 `v*.*.*` 标签时会创建 Release 并上传 EXE 与校验文件。
+GitHub Actions 会在提交和 Pull Request 上执行依赖审计与 Windows 构建。推送符合 `v*.*.*` 格式的标签时，工作流会创建 Release 并上传 EXE 与 `SHA256SUMS.txt`。
 
-## 许可证与来源
+## 参与项目
 
-本项目是 Macast 的衍生作品，继续使用 [GNU GPL v3 或更高版本](LICENSE)。修改日期从 2026-07-31 起，主要维护者为 `ccjjxx99`。发布二进制时同时公开本仓库对应源码。
+Bug、兼容性报告和功能建议可以提交到 [Issues](https://github.com/ccjjxx99/Macast-RTX-Edition/issues)。提交问题时，请尽量附上 Windows 版本、显卡与驱动版本、控制端类型、媒体协议以及相关日志。
 
-mpv 与随官方构建包含的 FFmpeg、libplacebo 等组件拥有各自许可证；准确来源、版本和再分发说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。安全问题请参阅 [SECURITY.md](SECURITY.md)。
+Pull Request 请保持改动范围清晰，并说明实际验证条件。涉及播放器、DLNA 协议或 RTX 处理链路的修改，建议同时提供可复现的媒体样例或日志。
 
-> 本项目只提供 DLNA 接收与播放能力，不提供影视源、解析接口或内容服务。请确保投放内容及配置来源合法、可信。
+## 许可证与致谢
 
-<details>
-<summary>查看上游 Macast 原始英文说明</summary>
+Macast RTX Edition 基于 [xfangfang/Macast](https://github.com/xfangfang/Macast) 开发，继续使用 [GNU GPL v3 或更高版本](LICENSE)。发布二进制时，对应源码也会保留在本仓库。
 
-<br>
+mpv、FFmpeg、libplacebo 等组件使用各自的许可证。来源、版本与再分发说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
-<img align="center" src="macast_slogan.png" alt="slogan" height="auto"/>
-
-# Macast
-
-[![visitor](https://visitor-badge.glitch.me/badge?page_id=xfangfang.Macast)](https://github.com/xfangfang/Macast/releases/latest)
-![stars](https://img.shields.io/badge/dynamic/json?label=github%20stars&query=stargazers_count&url=https%3A%2F%2Fapi.github.com%2Frepos%2Fxfangfang%2FMacast)
-[![downloads](https://img.shields.io/github/downloads/xfangfang/Macast/total?color=blue)](https://github.com/xfangfang/Macast/releases/latest)
-[![plugins](https://shields-staging.herokuapp.com/github/directory-file-count/xfangfang/Macast-plugins?type=dir&label=plugins)](https://github.com/xfangfang/Macast-plugins)
-[![pypi](https://img.shields.io/pypi/v/macast)](https://pypi.org/project/macast/)
-[![aur](https://img.shields.io/aur/version/macast-git?color=yellowgreen)](https://aur.archlinux.org/packages/macast-git/)
-[![build](https://img.shields.io/github/workflow/status/xfangfang/Macast/Build%20Macast)](https://github.com/xfangfang/Macast/actions/workflows/build-macast.yaml)
-[![mac](https://img.shields.io/badge/MacOS-10.14%20and%20higher-lightgrey?logo=Apple)](https://github.com/xfangfang/Macast/releases/latest)
-[![windows](https://img.shields.io/badge/Windows-7%20and%20higher-lightgrey?logo=Windows)](https://github.com/xfangfang/Macast/releases/latest)
-[![linux](https://img.shields.io/badge/Linux-Xorg-lightgrey?logo=Linux)](https://github.com/xfangfang/Macast/releases/latest)
-
-
-
-[中文说明](README_ZH.md)
-
-A menu bar application using mpv as **DLNA Media Renderer**. You can push videos, pictures or musics from your mobile phone to your computer.
-
-
-## Installation
-
-- ### MacOS || Windows || Debian
-
-  Download link:  [Macast release latest](https://github.com/xfangfang/Macast/releases/latest)
-
-- ### Package manager
-
-  ```shell
-  pip install macast
-  macast-gui # or macast-cli
-  ```
-
-  Please see our wiki for more information(like **aur** support): [#package-manager](https://github.com/xfangfang/Macast/wiki/Installation#package-manager)  
-  Linux users may have problems installing using pip. Two additional libraries that I have modified need to be installed:
-
-  ```shell
-  pip install git+https://github.com/xfangfang/pystray.git
-  pip install git+https://github.com/xfangfang/pyperclip.git
-  ```
-
-  **See [this](https://github.com/xfangfang/Macast/wiki/Installation#linux) for Linux compatibility**
-
-- ### Build from source
-
-  Please refer to: [Macast Development](docs/Development.md)
-
-
-## Usage
-
-- **For ordinary users**  
-After opening this app, a small icon will appear in the **menubar** / **taskbar** / **desktop panel**, then you can push your media files from a local DLNA client to your computer.
-
-- **For advanced users**  
-  1. By loading the [Macast-plugins](https://github.com/xfangfang/Macast-plugins), Macast can support third-party players like IINA and PotPlayer.  
-  For more information, see: [#how-to-use-third-party-player-plug-in](https://github.com/xfangfang/Macast/wiki/FAQ#how-to-use-third-party-player-plug-in)
-  2. You can modify the shortcut keys or configuration of the default mpv player by yourself, see: [#how-to-set-personal-configurations-to-mpv](https://github.com/xfangfang/Macast/wiki/FAQ#how-to-set-personal-configurations-to-mpv)
-
-- **For developer**  
-You can use a few lines of code to add support for other players like IINA and PotPlayer or even add additional features, like downloading media files while playing videos.  
-Tutorials and examples are shown in: [Macast/wiki/Custom-Renderer](https://github.com/xfangfang/Macast/wiki/Custom-Renderer).  
-Fell free to submit a pull request to [Macast-plugins](https://github.com/xfangfang/Macast-plugins).  
-
-
-## FAQ
-If you have any questions about this application, please check: [Macast/wiki/FAQ](https://github.com/xfangfang/Macast/wiki/FAQ).  
-If this does not solve your problem, please open a new issue to notify us, we are willing to help you solve the problem.
-
-## Screenshots
-
-You can copy the video link after the video is casted：  
-<img align="center" width="400" src="https://github.com/xfangfang/xfangfang.github.io/raw/master/assets/img/macast/copy_uri.png" alt="copy_uri" height="auto"/>
-
-Or select a third-party player plug-in  
-<img align="center" width="400" src="https://github.com/xfangfang/xfangfang.github.io/raw/master/assets/img/macast/select_renderer.png" alt="select_renderer" height="auto"/>
-
-## Relevant links
-
-[UPnP™ Device Architecture 1.1](http://upnp.org/specs/arch/UPnP-arch-DeviceArchitecture-v1.1.pdf)
-
-[UPnP™ Resources](http://upnp.org/resources/upnpresources.zip)
-
-[UPnP™ ContentDirectory:1 service](http://upnp.org/specs/av/UPnP-av-ContentDirectory-v1-Service.pdf)
-
-[UPnP™ MediaRenderer:1 device](http://upnp.org/specs/av/UPnP-av-MediaRenderer-v1-Device.pdf)
-
-[UPnP™ AVTransport:1 service](http://upnp.org/specs/av/UPnP-av-AVTransport-v1-Service.pdf)
-
-[UPnP™ RenderingControl:1 service](http://upnp.org/specs/av/UPnP-av-RenderingControl-v1-Service.pdf)
-
-[python-upnp-ssdp-example](https://github.com/ZeWaren/python-upnp-ssdp-example)
-
-</details>
+> 本项目只负责接收和播放媒体，不提供内容、媒体索引或解析服务。请确认所访问内容及其来源符合当地法律和服务条款。
