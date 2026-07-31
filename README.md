@@ -141,8 +141,8 @@ py -3.12 -m venv .venv-rtx
 默认产物：
 
 ```text
-.build\windows-v1.0.0\dist\Macast-RTX-Edition-v1.0.0.exe
-.build\windows-v1.0.0\dist\SHA256SUMS.txt
+.build\windows-v1.0.1\dist\Macast-RTX-Edition-v1.0.1.exe
+.build\windows-v1.0.1\dist\SHA256SUMS.txt
 ```
 
 构建脚本下载官方 mpv `0.41.0` Windows MSVC 包，并核对固定的 SHA-256：

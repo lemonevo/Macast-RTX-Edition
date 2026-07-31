@@ -106,7 +106,7 @@ class MPVRenderer(Renderer):
                                   default=SettingProperty.PlayerSize_Normal.value)
         if player_size == SettingProperty.PlayerSize_FullScreen.value:
             options['fullscreen'] = 'yes'
-        self.send_command(['loadfile', url, 'replace',
+        self.send_command(['loadfile', url, 'replace', '-1',
                            ','.join([f'{i}={options[i]}' for i in options])])
 
     def set_media_title(self, data):
@@ -496,7 +496,8 @@ class MPVRenderer(Renderer):
             if len(protocols) > 0:
                 protocol = protocols.pop()
                 position = protocol.get_state_position()
-                self.send_command(['loadfile', uri, 'replace', f'start={position}'])
+                self.send_command(['loadfile', uri, 'replace', '-1',
+                                   f'start={position}'])
             else:
                 self.send_command(['loadfile', uri, 'replace'])
             self.send_command(['set_property', 'title', self.title])
