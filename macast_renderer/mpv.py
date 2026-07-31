@@ -477,8 +477,10 @@ class MPVRenderer(Renderer):
                     '--vo=gpu-next',
                     '--gpu-api=d3d11',
                     '--script={}'.format(rtx_script),
-                    '--script-opts-append=macast_rtx-vsr={},macast_rtx-hdr={}'.format(
+                    '--script-opts-append=macast_rtx-vsr={}'.format(
                         'yes' if rtx_vsr else 'no',
+                    ),
+                    '--script-opts-append=macast_rtx-hdr={}'.format(
                         'yes' if rtx_hdr else 'no',
                     ),
                 ])

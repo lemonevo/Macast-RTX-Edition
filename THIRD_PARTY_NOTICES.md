@@ -4,15 +4,15 @@ Macast RTX Edition is a derivative of [xfangfang/Macast](https://github.com/xfan
 
 ## Bundled mpv binary
 
-Windows releases bundle the unmodified official mpv `v0.41.0` x86-64 MSVC asset:
+Windows releases bundle the unmodified official mpv `v0.41.0-dev-g63ada87ec` x86-64 MSVC development asset:
 
-- Binary archive: `mpv-v0.41.0-x86_64-pc-windows-msvc.zip`
-- Release: <https://github.com/mpv-player/mpv/releases/tag/v0.41.0>
-- Corresponding source tag: <https://github.com/mpv-player/mpv/tree/v0.41.0>
-- SHA-256: `4E197F729F5071C6772F35FFFD96E0F36E3E8A044BD9479B136BB09B7C6A80FF`
-- mpv license information: <https://github.com/mpv-player/mpv/blob/v0.41.0/Copyright>
+- Binary archive: `mpv-v0.41.0-dev-g63ada87ec-30636475556-x86_64-pc-windows-msvc.zip`
+- Rolling release: <https://github.com/mpv-player/mpv/releases/tag/git-release>
+- Corresponding source commit: <https://github.com/mpv-player/mpv/tree/63ada87ec>
+- SHA-256: `B195E12366FC95EABF22A0D409C160069BB222371C7F4570C2CEF7B217EE80F7`
+- mpv license information: <https://github.com/mpv-player/mpv/blob/63ada87ec/Copyright>
 
-The official mpv build reports FFmpeg, libplacebo, and other linked components at runtime with `mpv.exe --version`. Their corresponding source and build configuration are available through the signed mpv release tag and mpv's CI configuration.
+The official mpv build reports FFmpeg, libplacebo, and other linked components at runtime with `mpv.exe --version`. Their corresponding source and build configuration are available through the pinned mpv source commit and mpv's CI configuration.
 
 ## Direct Python runtime dependencies
 

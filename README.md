@@ -4,7 +4,7 @@
 [![Downloads](https://img.shields.io/github/downloads/ccjjxx99/Macast-RTX-Edition/total)](https://github.com/ccjjxx99/Macast-RTX-Edition/releases)
 [![Build Windows](https://github.com/ccjjxx99/Macast-RTX-Edition/actions/workflows/build-windows.yml/badge.svg)](https://github.com/ccjjxx99/Macast-RTX-Edition/actions/workflows/build-windows.yml)
 [![GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-76b900)](LICENSE)
-[![mpv 0.41.0](https://img.shields.io/badge/mpv-0.41.0-76b900)](https://github.com/mpv-player/mpv/releases/tag/v0.41.0)
+[![mpv git 63ada87ec](https://img.shields.io/badge/mpv-git%2063ada87ec-76b900)](https://github.com/mpv-player/mpv/releases/tag/git-release)
 
 Macast RTX Edition 是一款面向 Windows 的轻量级 DLNA/UPnP 媒体接收器。它让电脑出现在局域网的投放设备列表中，接收来自手机、平板、电脑、家庭服务器及其他 DLNA 控制端的视频、音乐和图片，并交给内置的 mpv 播放。
 
@@ -23,7 +23,7 @@ Macast RTX Edition 是一款面向 Windows 的轻量级 DLNA/UPnP 媒体接收�
 
 ### 🎬 mpv 播放内核
 
-- 内置 mpv `0.41.0` 官方 Windows 64 位版本。
+- 内置 mpv `v0.41.0-dev-g63ada87ec` 官方 Windows 64 位开发版，包含 NVIDIA RTX Video HDR 输出修复。
 - 支持硬件解码、全屏、窗口置顶和播放位置记忆。
 - 可以设置窗口尺寸与屏幕位置。
 - 可从托盘菜单复制当前媒体地址，方便调试或交给其他播放器。
@@ -51,7 +51,7 @@ Macast RTX Edition 是一款面向 Windows 的轻量级 DLNA/UPnP 媒体接收�
 ```mermaid
 flowchart LR
     A["DLNA 控制端<br/>手机、平板、电脑、家庭服务器"] -->|媒体地址与播放指令| B["Macast RTX Edition"]
-    B --> C["mpv 0.41.0"]
+    B --> C["mpv git 63ada87ec"]
     C --> D["硬件解码与 RTX Video"]
     D --> E["Windows 显示器或音频设备"]
 ```
@@ -145,14 +145,14 @@ py -3.12 -m venv .venv-rtx
 默认产物：
 
 ```text
-.build\windows-v1.1.0\dist\Macast-RTX-Edition-v1.1.0.exe
-.build\windows-v1.1.0\dist\SHA256SUMS.txt
+.build\windows-v1.1.1\dist\Macast-RTX-Edition-v1.1.1.exe
+.build\windows-v1.1.1\dist\SHA256SUMS.txt
 ```
 
-构建脚本下载官方 mpv `0.41.0` Windows MSVC 包，并核对固定的 SHA-256：
+构建脚本下载官方 mpv `v0.41.0-dev-g63ada87ec` Windows x64 MSVC 包，并核对固定的 SHA-256：
 
 ```text
-4E197F729F5071C6772F35FFFD96E0F36E3E8A044BD9479B136BB09B7C6A80FF
+B195E12366FC95EABF22A0D409C160069BB222371C7F4570C2CEF7B217EE80F7
 ```
 
 手动执行依赖审计：

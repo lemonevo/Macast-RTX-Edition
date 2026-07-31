@@ -11,11 +11,13 @@ if (-not $ArtifactRoot) {
     $ArtifactRoot = Join-Path $RepositoryRoot ".artifacts"
 }
 
-$MpvVersion = "0.41.0"
-$ArchiveName = "mpv-v$MpvVersion-x86_64-pc-windows-msvc.zip"
-$ExpectedSha256 = "4E197F729F5071C6772F35FFFD96E0F36E3E8A044BD9479B136BB09B7C6A80FF"
-$DownloadUrl = "https://github.com/mpv-player/mpv/releases/download/v$MpvVersion/$ArchiveName"
-$VersionRoot = Join-Path $ArtifactRoot "mpv-v$MpvVersion"
+$MpvVersion = "0.41.0-dev-g63ada87ec"
+$MpvBuildId = "30636475556"
+$MpvCommit = "63ada87ec"
+$ArchiveName = "mpv-v$MpvVersion-$MpvBuildId-x86_64-pc-windows-msvc.zip"
+$ExpectedSha256 = "B195E12366FC95EABF22A0D409C160069BB222371C7F4570C2CEF7B217EE80F7"
+$DownloadUrl = "https://github.com/mpv-player/mpv/releases/download/git-release/$ArchiveName"
+$VersionRoot = Join-Path $ArtifactRoot "mpv-v$MpvVersion-$MpvBuildId"
 $ArchivePath = Join-Path $VersionRoot $ArchiveName
 $ExtractRoot = Join-Path $VersionRoot "extracted"
 $MpvPath = Join-Path $ExtractRoot "mpv.exe"
@@ -24,7 +26,7 @@ $VulkanPath = Join-Path $ExtractRoot "vulkan-1.dll"
 New-Item -ItemType Directory -Path $VersionRoot -Force | Out-Null
 
 if (-not (Test-Path -LiteralPath $ArchivePath)) {
-    Write-Host "Downloading official mpv v$MpvVersion..."
+    Write-Host "Downloading official mpv git-release $MpvVersion..."
     Invoke-WebRequest -UseBasicParsing -Uri $DownloadUrl -OutFile $ArchivePath
 }
 
@@ -54,12 +56,13 @@ foreach ($RequiredFile in @($MpvPath, $VulkanPath)) {
 }
 
 $VersionLine = (& $MpvPath --version | Select-Object -First 1)
-if ($VersionLine -notmatch "v0\.41\.0") {
+if ($VersionLine -notmatch [regex]::Escape("g$MpvCommit")) {
     throw "Unexpected mpv binary version: $VersionLine"
 }
 
 [pscustomobject]@{
     Version = $MpvVersion
+    Commit = $MpvCommit
     Archive = $ArchivePath
     ArchiveSha256 = $ActualSha256
     Mpv = $MpvPath
