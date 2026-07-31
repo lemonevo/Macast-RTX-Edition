@@ -120,6 +120,7 @@ class App:
         else:
             self.app = pystray.Icon(self.name,
                                     Image.open(self.icon),
+                                    title=self.name,
                                     menu=pystray.Menu(
                                         lambda:
                                         self._build_menu_pystray(self.menu)))

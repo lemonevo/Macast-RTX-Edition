@@ -15,7 +15,7 @@
         <div>
             <p class="eyebrow">DLNA MEDIA RENDERER</p>
             <h1>Macast <span>RTX Edition</span></h1>
-            <p class="lede">让 OK影视、TVBox 等 DLNA 控制端把视频投到电脑，并由新版 mpv 接入 NVIDIA RTX Video 处理链路。</p>
+            <p class="lede">将 Windows 电脑变成轻量级 DLNA 媒体接收器，并由新版 mpv 接入 NVIDIA RTX Video 处理链路。</p>
         </div>
         <div class="status-card">
             <span class="status-dot" aria-hidden="true"></span>
@@ -39,12 +39,12 @@
                 <article class="feature">
                     <span class="feature-index">01</span>
                     <h2>RTX VSR</h2>
-                    <p>在托盘菜单中启用。程序只在视频确实需要放大且源分辨率不高于 1440p 时加入 NVIDIA 超分辨率滤镜。</p>
+                    <p>检测到受支持的 RTX GPU 时默认启用。程序只在视频确实需要放大且源分辨率不高于 1440p 时加入 NVIDIA 超分辨率滤镜。</p>
                 </article>
                 <article class="feature">
                     <span class="feature-index">02</span>
                     <h2>RTX Video HDR</h2>
-                    <p>先在 Windows 中开启 HDR，再从托盘菜单启用。已是 HDR 的视频会由 NVIDIA 处理器自动跳过转换。</p>
+                    <p>检测到受支持的 RTX GPU 时默认启用；实际生效还需在 Windows 中开启 HDR。已是 HDR 的视频会自动跳过转换。</p>
                 </article>
                 <article class="feature">
                     <span class="feature-index">03</span>
@@ -97,8 +97,8 @@
             <ol>
                 <li>保持手机和电脑处于同一局域网，并允许程序通过 Windows 专用网络防火墙。</li>
                 <li>启动后在系统托盘找到 Macast RTX Edition。</li>
-                <li>在 OK影视或 TVBox 中点击投屏，选择名称中带有 <code>Macast RTX</code> 的设备。</li>
-                <li>通过托盘菜单分别启用 RTX Video Super Resolution 和 RTX Video HDR。</li>
+                <li>在任意兼容的 DLNA 控制端点击投放，选择名称中带有 <code>Macast RTX</code> 的设备。</li>
+                <li>程序会检测显卡并设置 RTX 功能的默认状态，也可通过托盘菜单分别关闭 VSR 和 HDR。</li>
                 <li>在 NVIDIA App 的“系统 → 视频”中确认增强状态是否处于活动。</li>
             </ol>
             <div class="notice">

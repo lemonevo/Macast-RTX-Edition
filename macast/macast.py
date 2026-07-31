@@ -392,6 +392,20 @@ class Macast(App):
             msg = _("running at menu bar")
         else:
             msg = _("running at desktop panel")
+        renderer_setting = getattr(
+            self.service.renderer,
+            "renderer_setting",
+            None,
+        )
+        take_notice = getattr(
+            renderer_setting,
+            "take_startup_notice",
+            None,
+        )
+        if callable(take_notice):
+            capability_notice = take_notice()
+            if capability_notice:
+                msg = "{} · {}".format(msg, capability_notice)
         if self.platform == Platform.Darwin:
             self.notification(_("Macast is hidden"), msg, sound=False)
         else:

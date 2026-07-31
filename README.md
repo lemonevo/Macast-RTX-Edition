@@ -32,6 +32,8 @@ Macast RTX Edition 是一款面向 Windows 的轻量级 DLNA/UPnP 媒体接收�
 ### 🟢 NVIDIA RTX Video
 
 - RTX Video Super Resolution（VSR）与 RTX Video HDR 可以分别开关。
+- 启动时自动检测 Windows 显卡；检测到受支持的 NVIDIA RTX GPU 时，新配置默认开启 VSR 与 HDR。
+- 未检测到受支持的 RTX GPU 时，两项功能自动关闭，托盘菜单会显示检测状态且不会加载 RTX 滤镜。
 - VSR 根据视频尺寸和播放窗口自动计算放大倍率，只在视频确实被放大时启用。
 - 默认处理最高 1440p 的输入，放大倍率限制在 `1.05x`～`4x`。
 - 使用 `gpu-next`、D3D11、`d3d11va` 和 `d3d11vpp` 接入 NVIDIA 视频处理链路。
@@ -68,7 +70,9 @@ Macast RTX Edition 是接收端，不是屏幕镜像工具。控制端发送媒�
 
 ## 🟢 RTX 设置
 
-RTX VSR 默认开启，RTX Video HDR 默认关闭。普通显卡或核显也能使用 DLNA 接收和 mpv 播放，只需在托盘菜单中关闭 RTX 选项。
+程序启动时会通过 NVIDIA 驱动工具和 Windows 显示设备信息检测显卡。检测到受支持的 NVIDIA RTX GPU 后，新配置默认开启 RTX VSR 与 RTX Video HDR，用户仍可在托盘菜单中分别关闭。未检测到受支持显卡时，两项功能保持关闭并显示不可用提示，DLNA 接收和普通 mpv 播放不受影响。
+
+升级已有配置时会尽量保留已经保存的 RTX 开关选择；如果显卡能力从支持变为不支持，两项功能会自动关闭。
 
 启用 RTX 功能需要：
 
@@ -141,8 +145,8 @@ py -3.12 -m venv .venv-rtx
 默认产物：
 
 ```text
-.build\windows-v1.0.1\dist\Macast-RTX-Edition-v1.0.1.exe
-.build\windows-v1.0.1\dist\SHA256SUMS.txt
+.build\windows-v1.1.0\dist\Macast-RTX-Edition-v1.1.0.exe
+.build\windows-v1.1.0\dist\SHA256SUMS.txt
 ```
 
 构建脚本下载官方 mpv `0.41.0` Windows MSVC 包，并核对固定的 SHA-256：

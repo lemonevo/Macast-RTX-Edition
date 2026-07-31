@@ -19,6 +19,7 @@ from enum import Enum
 from macast.utils import SETTING_DIR, Setting
 from macast.renderer import Renderer, RendererSetting
 from macast.gui import App, MenuItem
+from macast_renderer.rtx import detect_rtx_video_capability
 
 if os.name == 'nt':
     import _winapi
@@ -26,6 +27,55 @@ if os.name == 'nt':
 
 logger = logging.getLogger("MPVRenderer")
 logger.setLevel(logging.INFO)
+
+
+def initialize_rtx_video_settings(capability):
+    """Apply hardware-aware defaults while preserving stable user choices."""
+    Setting.load()
+    settings = Setting.setting
+    state_key = SettingProperty.RTXVideoCapabilityState.name
+    current_state = (
+        "supported" if capability.supported
+        else "unsupported" if capability.detected
+        else "unknown"
+    )
+    previous_state = settings.get(state_key)
+    changed = False
+
+    if current_state != "unknown":
+        default_value = 1 if capability.supported else 0
+        feature_keys = (
+            SettingProperty.RTXVideoVSR.name,
+            SettingProperty.RTXVideoHDR.name,
+        )
+
+        if previous_state is None:
+            for feature_key in feature_keys:
+                if capability.supported:
+                    if feature_key not in settings:
+                        settings[feature_key] = default_value
+                        changed = True
+                elif settings.get(feature_key) != default_value:
+                    settings[feature_key] = default_value
+                    changed = True
+        elif previous_state != current_state:
+            for feature_key in feature_keys:
+                if settings.get(feature_key) != default_value:
+                    settings[feature_key] = default_value
+                    changed = True
+
+        if previous_state != current_state:
+            settings[state_key] = current_state
+            changed = True
+
+    if changed:
+        Setting.save()
+
+    default_value = 1 if capability.supported else 0
+    return (
+        bool(Setting.get(SettingProperty.RTXVideoVSR, default_value)),
+        bool(Setting.get(SettingProperty.RTXVideoHDR, default_value)),
+    )
 
 
 class ObserveProperty(Enum):
@@ -391,13 +441,18 @@ class MPVRenderer(Renderer):
             # set hardware
             hw = Setting.get(SettingProperty.PlayerHW,
                              default=SettingProperty.PlayerHW_Enable.value)
-            rtx_vsr = bool(Setting.get(
+            rtx_capability = detect_rtx_video_capability()
+            rtx_vsr = rtx_capability.supported and bool(Setting.get(
                 SettingProperty.RTXVideoVSR,
-                default=SettingProperty.RTXVideoVSR_Enable.value,
+                default=SettingProperty.RTXVideoVSR_Enable.value
+                if rtx_capability.supported
+                else SettingProperty.RTXVideoVSR_Disable.value,
             ))
-            rtx_hdr = bool(Setting.get(
+            rtx_hdr = rtx_capability.supported and bool(Setting.get(
                 SettingProperty.RTXVideoHDR,
-                default=SettingProperty.RTXVideoHDR_Disable.value,
+                default=SettingProperty.RTXVideoHDR_Enable.value
+                if rtx_capability.supported
+                else SettingProperty.RTXVideoHDR_Disable.value,
             ))
 
             if hw == SettingProperty.PlayerHW_Disable.value:
@@ -547,6 +602,8 @@ class SettingProperty(Enum):
     RTXVideoHDR_Disable = 0
     RTXVideoHDR_Enable = 1
 
+    RTXVideoCapabilityState = 620
+
 
 class MPVRendererSetting(RendererSetting):
     def __init__(self):
@@ -555,6 +612,8 @@ class MPVRendererSetting(RendererSetting):
         self.playerHWItem = None
         self.rtxVSRItem = None
         self.rtxHDRItem = None
+        self.rtx_capability = detect_rtx_video_capability()
+        self.rtx_notice_shown = False
         Setting.load()
         self.setting_player_size = Setting.get(SettingProperty.PlayerSize,
                                                SettingProperty.PlayerSize_Normal.value)
@@ -564,13 +623,11 @@ class MPVRendererSetting(RendererSetting):
                                              SettingProperty.PlayerHW_Enable.value)
         self.setting_player_ontop = Setting.get(SettingProperty.PlayerOntop,
                                                 SettingProperty.PlayerOntop_True.value)
-        self.setting_rtx_vsr = Setting.get(
-            SettingProperty.RTXVideoVSR,
-            SettingProperty.RTXVideoVSR_Enable.value,
-        )
-        self.setting_rtx_hdr = Setting.get(
-            SettingProperty.RTXVideoHDR,
-            SettingProperty.RTXVideoHDR_Disable.value,
+        (
+            self.setting_rtx_vsr,
+            self.setting_rtx_hdr,
+        ) = initialize_rtx_video_settings(
+            self.rtx_capability,
         )
 
     def build_menu(self):
@@ -596,16 +653,33 @@ class MPVRendererSetting(RendererSetting):
             self.rtxVSRItem = MenuItem(
                 "RTX Video Super Resolution",
                 self.on_rtx_vsr_clicked,
-                checked=bool(self.setting_rtx_vsr),
+                checked=(
+                    self.rtx_capability.supported
+                    and bool(self.setting_rtx_vsr)
+                ),
+                enabled=self.rtx_capability.supported,
             )
             self.rtxHDRItem = MenuItem(
                 "RTX Video HDR",
                 self.on_rtx_hdr_clicked,
-                checked=bool(self.setting_rtx_hdr),
+                checked=(
+                    self.rtx_capability.supported
+                    and bool(self.setting_rtx_hdr)
+                ),
+                enabled=self.rtx_capability.supported,
             )
             rtx_items = [
                 None,
-                MenuItem("NVIDIA RTX Video", enabled=False),
+                MenuItem(
+                    "NVIDIA RTX Video"
+                    if self.rtx_capability.supported
+                    else "NVIDIA RTX Video (Unavailable)",
+                    enabled=False,
+                ),
+                MenuItem(
+                    self.rtx_capability.menu_status,
+                    enabled=False,
+                ),
                 self.rtxVSRItem,
                 self.rtxHDRItem,
             ]
@@ -661,17 +735,37 @@ class MPVRendererSetting(RendererSetting):
                                 sound=False)
         cherrypy.engine.publish('reload_renderer')
 
+    def take_startup_notice(self):
+        if self.rtx_capability.supported or self.rtx_notice_shown:
+            return None
+        self.rtx_notice_shown = True
+        return self.rtx_capability.unavailable_notice
+
     def on_renderer_ontop_clicked(self, item):
         item.checked = not item.checked
         Setting.set(SettingProperty.PlayerOntop, 1 if item.checked else 0)
         self.reloadPlayer()
 
     def on_rtx_vsr_clicked(self, item):
+        if not self.rtx_capability.supported:
+            cherrypy.engine.publish(
+                'app_notify',
+                "NVIDIA RTX Video",
+                self.rtx_capability.unavailable_notice,
+            )
+            return
         item.checked = not item.checked
         Setting.set(SettingProperty.RTXVideoVSR, 1 if item.checked else 0)
         self.reloadPlayer()
 
     def on_rtx_hdr_clicked(self, item):
+        if not self.rtx_capability.supported:
+            cherrypy.engine.publish(
+                'app_notify',
+                "NVIDIA RTX Video",
+                self.rtx_capability.unavailable_notice,
+            )
+            return
         item.checked = not item.checked
         Setting.set(SettingProperty.RTXVideoHDR, 1 if item.checked else 0)
         self.reloadPlayer()
