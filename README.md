@@ -1,3 +1,111 @@
+# Macast RTX Edition
+
+[![Build Windows](https://github.com/ccjjxx99/Macast-RTX-Edition/actions/workflows/build-windows.yml/badge.svg)](https://github.com/ccjjxx99/Macast-RTX-Edition/actions/workflows/build-windows.yml)
+[![GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-76b900)](LICENSE)
+[![mpv 0.41.0](https://img.shields.io/badge/mpv-0.41.0-76b900)](https://github.com/mpv-player/mpv/releases/tag/v0.41.0)
+
+Macast RTX Edition 是 [xfangfang/Macast](https://github.com/xfangfang/Macast) 的 Windows 增强版：保留轻量的 DLNA/UPnP Media Renderer，用新版 mpv 接收 OK影视、TVBox 等应用的投屏，并接入 NVIDIA RTX Video Super Resolution（VSR）与 RTX Video HDR。
+
+当前版本：`1.0.0`。项目名称使用正确拼写 `Macast-RTX-Edition`。
+
+## 主要变化
+
+- 内置 mpv `0.41.0` 官方 Windows MSVC 构建，替换上游 2022 年使用的 mpv `0.34.0`。
+- 托盘菜单可分别启用 RTX VSR 与 RTX Video HDR。
+- VSR 会根据源视频与当前输出区域自动选择 `1.05x`～`4x` 倍率，只处理不高于 1440p、且确实发生放大的视频，避免把原生 4K 固定放大到 8K。
+- RTX 模式明确使用 `gpu-next + D3D11 + d3d11va + d3d11vpp`，由 NVIDIA 驱动完成 VSR/HDR 处理。
+- Python 运行与构建依赖已锁定到当前维护版本；`netifaces` 更换为兼容导入名的维护分支 `netifaces-plus`，`appdirs` 更换为 `platformdirs`。
+- 移除旧管理页对 Vue 2、Vue Resource、Element UI 和远程字体的运行依赖，改为无框架、本地静态页面。
+- 管理接口仅允许本机回环地址访问，并增加 CSRF 校验；旧版从局域网远程下载并执行插件的入口已移除。
+- LAN 输入的 XML 禁止实体解析、DTD 与网络访问；UPnP 事件回调限制到发起订阅的控制端地址。
+- Windows 构建流程使用固定提交的 GitHub Actions、固定 mpv 下载地址和 SHA-256 校验。
+
+## 运行条件
+
+- Windows 10/11 64 位。
+- NVIDIA GeForce RTX 20 系列或更新显卡；RTX 50 系列受 NVIDIA RTX Video SDK 1.1 支持。
+- 较新的 NVIDIA Game Ready 或 Studio 驱动。
+- RTX Video HDR 还需要 HDR 显示器，并在 Windows“设置 → 系统 → 显示 → HDR”中打开 HDR。
+- 手机与电脑处于同一局域网，路由器未启用 AP/客户端隔离。
+
+非 RTX 电脑仍可把它当作普通 Macast 使用，但应在托盘菜单中关闭两个 RTX 选项。
+
+## 安装与投屏
+
+1. 从 [Releases](https://github.com/ccjjxx99/Macast-RTX-Edition/releases) 下载 `Macast-RTX-Edition-v1.0.0.exe`。
+2. 启动程序；Windows 防火墙询问时，只允许“专用网络”。
+3. 在系统托盘中找到 Macast RTX Edition。
+4. 打开 OK影视或 TVBox 的投屏列表，选择名称中带有 `Macast RTX` 的设备。
+5. 在托盘菜单的 `NVIDIA RTX Video` 分组中切换：
+   - `RTX Video Super Resolution`
+   - `RTX Video HDR`
+6. 打开 NVIDIA App 的“系统 → 视频”，确认相应功能显示为活动状态。
+
+RTX VSR 默认开启；RTX Video HDR 默认关闭。HDR 开启后，mpv 会把 SDR 内容交给 NVIDIA RTX Video HDR，原生 HDR 内容由驱动自动跳过转换。
+
+## 设置与日志
+
+托盘菜单中的“Advanced Setting”会打开本机管理页。页面提供：
+
+- 当前本地 Renderer/Protocol 组件；
+- JSON 高级设置；
+- 运行日志；
+- RTX 使用条件与投屏排障提示。
+
+管理页和相关 API 只接受来自 `127.0.0.1` 或 `::1` 的请求。自定义 Renderer/Protocol 仍可放入配置目录，但插件是与主程序同权限运行的 Python 代码，只应使用自己审查过的文件。
+
+Windows 配置目录：
+
+```text
+%LOCALAPPDATA%\ccjjxx99\Macast-RTX-Edition
+```
+
+## 从源码构建
+
+推荐 Python 3.12。构建脚本不会清理或覆盖既有目录；目标路径已经存在时会直接停止，请为下一次构建指定新目录。
+
+```powershell
+py -3.12 -m venv .venv-rtx
+.\.venv-rtx\Scripts\python.exe -m pip install -r requirements\build-windows.txt
+.\scripts\fetch_mpv.ps1
+.\scripts\build_windows.ps1 -Python .\.venv-rtx\Scripts\python.exe
+```
+
+默认产物：
+
+```text
+.build\windows-v1.0.0\dist\Macast-RTX-Edition-v1.0.0.exe
+.build\windows-v1.0.0\dist\SHA256SUMS.txt
+```
+
+`fetch_mpv.ps1` 只接受下面这个官方资源：
+
+```text
+https://github.com/mpv-player/mpv/releases/download/v0.41.0/mpv-v0.41.0-x86_64-pc-windows-msvc.zip
+SHA256: 4E197F729F5071C6772F35FFFD96E0F36E3E8A044BD9479B136BB09B7C6A80FF
+```
+
+依赖审计：
+
+```powershell
+.\.venv-rtx\Scripts\python.exe -m pip_audit -r requirements\windows.txt
+```
+
+GitHub Actions 会在每次提交和 Pull Request 上重新执行依赖审计与 Windows 构建；推送 `v*.*.*` 标签时会创建 Release 并上传 EXE 与校验文件。
+
+## 许可证与来源
+
+本项目是 Macast 的衍生作品，继续使用 [GNU GPL v3 或更高版本](LICENSE)。修改日期从 2026-07-31 起，主要维护者为 `ccjjxx99`。发布二进制时同时公开本仓库对应源码。
+
+mpv 与随官方构建包含的 FFmpeg、libplacebo 等组件拥有各自许可证；准确来源、版本和再分发说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。安全问题请参阅 [SECURITY.md](SECURITY.md)。
+
+> 本项目只提供 DLNA 接收与播放能力，不提供影视源、解析接口或内容服务。请确保投放内容及配置来源合法、可信。
+
+<details>
+<summary>查看上游 Macast 原始英文说明</summary>
+
+<br>
+
 <img align="center" src="macast_slogan.png" alt="slogan" height="auto"/>
 
 # Macast
@@ -91,3 +199,5 @@ Or select a third-party player plug-in
 [UPnP™ RenderingControl:1 service](http://upnp.org/specs/av/UPnP-av-RenderingControl-v1-Service.pdf)
 
 [python-upnp-ssdp-example](https://github.com/ZeWaren/python-upnp-ssdp-example)
+
+</details>

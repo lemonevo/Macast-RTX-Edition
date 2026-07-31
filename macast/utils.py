@@ -6,7 +6,6 @@ import uuid
 import json
 import time
 import ctypes
-import appdirs
 import logging
 import platform
 import locale
@@ -14,16 +13,16 @@ import cherrypy
 import subprocess
 from enum import Enum
 import netifaces as ni
+from platformdirs import user_config_dir
 
 if sys.platform == 'darwin':
     from AppKit import NSBundle
 elif sys.platform == 'win32':
-    import win32api
-    import win32con
+    import winreg
 
 logger = logging.getLogger("Utils")
 DEFAULT_PORT = 0
-SETTING_DIR = appdirs.user_config_dir('Macast', 'xfangfang')
+SETTING_DIR = user_config_dir("Macast-RTX-Edition", "ccjjxx99")
 PROTOCOL_DIR = 'protocol'
 RENDERER_DIR = 'renderer'
 
@@ -47,7 +46,7 @@ class Setting:
     setting_path = os.path.join(SETTING_DIR, "macast_setting.json")
     last_ip = None
     base_path = None
-    friendly_name = "Macast({})".format(platform.node())
+    friendly_name = "Macast RTX ({})".format(platform.node())
     temp_friendly_name = None
     mpv_default_path = 'mpv'
 
@@ -57,7 +56,7 @@ class Setting:
         """
         if not os.path.exists(SETTING_DIR):
             os.makedirs(SETTING_DIR)
-        with open(Setting.setting_path, "w") as f:
+        with open(Setting.setting_path, "w", encoding="utf-8") as f:
             json.dump(obj=Setting.setting, fp=f, sort_keys=True, indent=4)
 
     @staticmethod
@@ -67,7 +66,7 @@ class Setting:
         logger.info("Load Setting")
         if Setting.version is None:
             try:
-                with open(Setting.get_base_path('.version'), 'r') as f:
+                with open(Setting.get_base_path('.version'), 'r', encoding="utf-8") as f:
                     Setting.version = f.read().strip()
             except FileNotFoundError as e:
                 Setting.version = "0.0"
@@ -76,7 +75,7 @@ class Setting:
                 Setting.setting = {}
             else:
                 try:
-                    with open(Setting.setting_path, "r") as f:
+                    with open(Setting.setting_path, "r", encoding="utf-8") as f:
                         Setting.setting = json.load(fp=f)
                     logger.error(Setting.setting)
                 except Exception as e:
@@ -184,8 +183,10 @@ class Setting:
                 ["osascript", "-e",
                  "user locale of (get system info)"]).decode().strip()
         elif sys.platform == 'win32':
-            windll = ctypes.windll.kernel32
-            lang = locale.windows_locale[windll.GetUserDefaultUILanguage()]
+            kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+            get_language = kernel32.GetUserDefaultUILanguage
+            get_language.restype = ctypes.c_ushort
+            lang = locale.windows_locale.get(get_language(), "en_US")
         else:
             lang = os.environ.get('LANGUAGE')
             if lang is None:
@@ -260,27 +261,31 @@ class Setting:
             if "python" in os.path.basename(sys.executable).lower():
                 return (1, "Not support to set start at login.")
 
-            key = win32api.RegOpenKey(win32con.HKEY_CURRENT_USER,
-                                      r'Software\Microsoft\Windows\CurrentVersion\Run',
-                                      0,
-                                      win32con.KEY_SET_VALUE)
             logger.info(sys.executable)
-            if launch:
-                try:
-                    win32api.RegSetValueEx(key, 'Macast', 0, win32con.REG_SZ, sys.executable)
-                    win32api.RegCloseKey(key)
-                except Exception as e:
-                    logger.error(e)
-                    # cherrypy.engine.publish("app_notify", "ERROR", f"{e}")
-                return 0, 1
-            else:
-                try:
-                    win32api.RegDeleteValue(key, 'Macast')
-                    win32api.RegCloseKey(key)
-                except Exception as e:
-                    logger.error(e)
-                    # cherrypy.engine.publish("app_notify", "ERROR", f"{e}")
-                return 0, 1
+            try:
+                with winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER,
+                    r"Software\Microsoft\Windows\CurrentVersion\Run",
+                    0,
+                    winreg.KEY_SET_VALUE,
+                ) as key:
+                    if launch:
+                        winreg.SetValueEx(
+                            key,
+                            "Macast-RTX-Edition",
+                            0,
+                            winreg.REG_SZ,
+                            sys.executable,
+                        )
+                    else:
+                        try:
+                            winreg.DeleteValue(key, "Macast-RTX-Edition")
+                        except FileNotFoundError:
+                            pass
+            except OSError as exc:
+                logger.error("Cannot update startup registration: %s", exc)
+                return 1, str(exc)
+            return 0, "success"
         else:
             return (1, 'Not support current platform.')
 
@@ -365,7 +370,7 @@ class XMLPath(Enum):
     AV_TRANSPORT = BASE_PATH + '/xml/AVTransport.xml'
     CONNECTION_MANAGER = BASE_PATH + '/xml/ConnectionManager.xml'
     RENDERING_CONTROL = BASE_PATH + '/xml/RenderingControl.xml'
-    SETTING_PAGE = BASE_PATH + '/xml/setting.html'
+    SETTING_PAGE = BASE_PATH + '/xml/settings_rtx.html'
     PROTOCOL_INFO = BASE_PATH + '/xml/SinkProtocolInfo.csv'
 
 

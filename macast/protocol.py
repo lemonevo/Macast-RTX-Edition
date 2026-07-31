@@ -1,7 +1,9 @@
 # Copyright (c) 2021 by xfangfang. All Rights Reserved.
 import json
+import ipaddress
 import os
 import re
+import secrets
 import sys
 import time
 import uuid
@@ -9,8 +11,8 @@ import http.client
 import logging
 import cherrypy
 import threading
+from urllib.parse import urlsplit
 
-import requests
 from lxml import etree
 from queue import Queue
 from enum import Enum
@@ -20,6 +22,47 @@ from .utils import load_xml, XMLPath, Setting, cherrypy_publish, SETTING_DIR
 
 logger = logging.getLogger("Protocol")
 logger.setLevel(logging.INFO)
+
+MAX_SOAP_BODY_BYTES = 1024 * 1024
+MAX_SETTINGS_BODY_BYTES = 64 * 1024
+
+
+def parse_untrusted_xml(data):
+    """Parse LAN-provided XML without entities, DTD access, or networking."""
+    parser = etree.XMLParser(
+        resolve_entities=False,
+        load_dtd=False,
+        no_network=True,
+        recover=False,
+        huge_tree=False,
+    )
+    return etree.fromstring(data, parser=parser)
+
+
+def is_loopback_address(address):
+    try:
+        parsed = ipaddress.ip_address(address)
+    except ValueError:
+        return False
+    if parsed.is_loopback:
+        return True
+    mapped = getattr(parsed, "ipv4_mapped", None)
+    return mapped is not None and mapped.is_loopback
+
+
+def callback_matches_request(callback_url, request_address):
+    """Limit UPnP callbacks to the controller that opened the subscription."""
+    parsed = urlsplit(callback_url)
+    if parsed.scheme != "http" or not parsed.hostname or parsed.username:
+        return False
+    try:
+        callback_address = ipaddress.ip_address(parsed.hostname)
+        remote_address = ipaddress.ip_address(request_address)
+    except ValueError:
+        return False
+    remote_address = getattr(remote_address, "ipv4_mapped", None) or remote_address
+    callback_address = getattr(callback_address, "ipv4_mapped", None) or callback_address
+    return callback_address == remote_address
 
 SERVICE_STATE_OBSERVED = {
     "AVTransport": ['TransportState',
@@ -210,15 +253,20 @@ class Protocol:
 
 class ObserveClient:
     def __init__(self, service, url, timeout=1800):
+        parsed = urlsplit(url)
+        if parsed.scheme != "http" or not parsed.hostname:
+            raise ValueError("Unsupported UPnP callback URL")
         self.url = url
         self.service = service
         self.startTime = int(time.time())
         self.sid = "uuid:{}".format(uuid.uuid4())
-        self.timeout = timeout
+        self.timeout = max(30, min(int(timeout), 86400))
         self.seq = 0
-        self.host = re.findall(r"//([0-9:.]*)", url)[0]
-        self.path = re.findall(r"//[0-9:.]*(.*)$", url)[0]
-        print("-----------------------------", self.host)
+        self.host = parsed.hostname
+        self.port = parsed.port or 80
+        self.path = parsed.path or "/"
+        if parsed.query:
+            self.path += "?" + parsed.query
         self.error = 0
 
     def is_timeout(self):
@@ -263,9 +311,11 @@ class ObserveClient:
         data = etree.tostring(root, encoding="UTF-8")
         logger.debug("Prop Change---------")
         logger.debug(data)
-        conn = http.client.HTTPConnection(self.host, timeout=5)
-        conn.request("NOTIFY", self.path, data, headers)
-        conn.close()
+        conn = http.client.HTTPConnection(self.host, self.port, timeout=5)
+        try:
+            conn.request("NOTIFY", self.path, data, headers)
+        finally:
+            conn.close()
         self.seq = self.seq + 1
 
 
@@ -571,7 +621,7 @@ class DLNAProtocol(Protocol):
         :param rawbody: soap request from dlna client
         :return:
         """
-        root = etree.fromstring(rawbody)[0][0]
+        root = parse_untrusted_xml(rawbody)[0][0]
         param = {}
         for node in root:
             param[node.tag] = node.text
@@ -686,7 +736,7 @@ class DLNAProtocol(Protocol):
         self.renderer.set_media_url(uri)
         title = Setting.get_friendly_name()
         try:
-            meta = etree.fromstring(data['CurrentURIMetaData'].value.encode())
+            meta = parse_untrusted_xml(data['CurrentURIMetaData'].value.encode())
             title_xml = meta.find('.//{{{}}}title'.format(meta.nsmap['dc']))
             if title_xml is not None and title_xml.text is not None:
                 title = title_xml.text
@@ -869,7 +919,7 @@ class Handler:
 
     def __init__(self):
         self.setting_page = load_xml(XMLPath.SETTING_PAGE.value).encode()
-        self.__downloading = False
+        self.csrf_token = secrets.token_urlsafe(32)
 
     @property
     def protocol(self) -> Protocol:
@@ -882,26 +932,43 @@ class Handler:
     def reload(self):
         cherrypy.server.httpserver = _cpnative_server.CPHTTPServer(cherrypy.server)
 
-    def __download_plugin(self, path, url):
-        try:
-            with open(path, 'wb') as f:
-                f.write(requests.get(url).content)
-        except Exception as e:
-            logger.error(f"download plugin error: {e}")
-        finally:
-            self.__downloading = False
-            Setting.restart()
-            # cherrypy.engine.restart()
+    @staticmethod
+    def require_loopback():
+        if not is_loopback_address(cherrypy.request.remote.ip):
+            raise cherrypy.HTTPError(403, "Local settings are available only on this computer")
+
+    @staticmethod
+    def set_local_security_headers():
+        cherrypy.response.headers.update({
+            "Cache-Control": "no-store",
+            "Content-Security-Policy": (
+                "default-src 'self'; "
+                "script-src 'self'; "
+                "style-src 'self'; "
+                "img-src 'self' data:; "
+                "connect-src 'self'; "
+                "object-src 'none'; "
+                "base-uri 'none'; "
+                "frame-ancestors 'none'"
+            ),
+            "Referrer-Policy": "no-referrer",
+            "X-Content-Type-Options": "nosniff",
+            "X-Frame-Options": "DENY",
+        })
 
     def GET(self, param=None, *args, **kwargs):
         if not Setting.is_service_running():
             raise cherrypy.HTTPError(503, 'Server restarting')
         if param == 'api':
+            self.require_loopback()
+            self.set_local_security_headers()
             cherrypy.response.headers['Content-Type'] = 'application/json;charset:utf-8'
             query = kwargs.get('query', '')
             res = {
                 'api?query=log': 'get logs of macast',
-                'api?query=settings': 'get settings of macast',
+                'api?query=launch-param': 'get settings of macast',
+                'api?query=plugin-info': 'get local plugin information',
+                'api?query=session': 'get a local settings session token',
             }
             if query == 'log':
                 log_path = os.path.join(SETTING_DIR, 'macast.log')
@@ -913,7 +980,7 @@ class Handler:
                     pass
                 res = {"logs": data}
             elif query == 'launch-param':
-                res = Setting.setting
+                res = Setting.load()
             elif query == 'plugin-info':
                 info = cherrypy_publish('get_plugin_info', [])
                 res = {
@@ -921,49 +988,41 @@ class Handler:
                     'version': Setting.version,
                     'plugins': info
                 }
+            elif query == 'session':
+                res = {'csrf_token': self.csrf_token}
             return json.dumps(res, indent=4).encode()
         if param is not None:
             raise cherrypy.HTTPRedirect('/')
+        self.require_loopback()
+        self.set_local_security_headers()
         cherrypy.response.headers['Content-Type'] = 'text/html'
-        # return self.setting_page
-        return load_xml(XMLPath.SETTING_PAGE.value).encode()
+        return self.setting_page
 
     def POST(self, *args, **kwargs):
+        self.require_loopback()
+        self.set_local_security_headers()
         cherrypy.response.headers['Content-Type'] = 'application/json;charset:utf-8'
+        request_token = cherrypy.request.headers.get('X-Macast-CSRF', '')
+        if not secrets.compare_digest(request_token, self.csrf_token):
+            raise cherrypy.HTTPError(403, 'Invalid local settings session')
         res = {'code': 0, 'message': 'success'}
         if kwargs.get('save-launch-param', None) is not None:
             setting = kwargs.get('save-launch-param', None)
+            if len(setting.encode('utf-8')) > MAX_SETTINGS_BODY_BYTES:
+                raise cherrypy.HTTPError(413, 'Settings payload is too large')
             try:
                 setting = json.loads(setting)
-            except Exception as e:
+                if not isinstance(setting, dict):
+                    raise ValueError('settings must be a JSON object')
+            except (TypeError, ValueError, json.JSONDecodeError):
                 res['code'] = 1
                 res['message'] = 'json format error'
             else:
                 Setting.setting = setting
                 Setting.save()
                 Setting.restart()
-                # cherrypy.engine.restart()
-        elif kwargs.get('install-plugin', None) is not None:
-            plugin = kwargs.get('install-plugin', None)
-            if self.__downloading:
-                cherrypy.engine.publish('app_notify', 'ERROR', 'Downloading other plugin now')
-                res['code'] = 1
-                res['message'] = 'Downloading other plugin now'
-            else:
-                cherrypy.engine.publish('app_notify', 'INFO', 'installing plugin...')
-                self.__downloading = True
-                try:
-                    plugin = json.loads(plugin)
-                    url = plugin.get('url', '')
-                    plugin_name = url.split('/')[-1]
-                    local_path = os.path.join(SETTING_DIR, plugin.get('type', 'renderer'), plugin_name)
-                    threading.Thread(target=self.__download_plugin(local_path, url),
-                                     daemon=True).start()
-                except Exception as e:
-                    res['code'] = 1
-                    res['message'] = 'json format error'
         else:
-            logger.info(kwargs)
+            raise cherrypy.HTTPError(400, 'Unsupported local settings action')
 
         return json.dumps(res, indent=4).encode()
 
@@ -995,11 +1054,11 @@ class DLNAHandler(Handler):
     def build_description(self):
         self.description = load_xml(XMLPath.DESCRIPTION.value).format(
             friendly_name=Setting.get_friendly_name(),
-            manufacturer="xfangfang",
-            manufacturer_url="https://github.com/xfangfang",
-            model_description="AVTransport Media Renderer",
-            model_name="Macast",
-            model_url="https://xfangfang.github.io/Macast",
+            manufacturer="Macast contributors",
+            manufacturer_url="https://github.com/ccjjxx99/Macast-RTX-Edition",
+            model_description="DLNA renderer with NVIDIA RTX Video support",
+            model_name="Macast RTX Edition",
+            model_url="https://github.com/ccjjxx99/Macast-RTX-Edition",
             model_number=Setting.get_version(),
             uuid=Setting.get_usn(),
             serial_num=1024,
@@ -1013,10 +1072,15 @@ class DLNAHandler(Handler):
         return super(DLNAHandler, self).GET(param, *args, **kwargs)
 
     def POST(self, service=None, param=None, *args, **kwargs):
-        length = cherrypy.request.headers['Content-Length']
-        rawbody = cherrypy.request.body.read(int(length))
-        logger.debug('RAW: {}'.format(rawbody))
         if param == 'action':
+            try:
+                length = int(cherrypy.request.headers.get('Content-Length', '0'))
+            except ValueError:
+                raise cherrypy.HTTPError(400, 'Invalid Content-Length')
+            if length <= 0 or length > MAX_SOAP_BODY_BYTES:
+                raise cherrypy.HTTPError(413, 'Invalid SOAP request size')
+            rawbody = cherrypy.request.body.read(length)
+            logger.debug('RAW: {}'.format(rawbody))
             res = self.protocol.call(rawbody)
             cherrypy.response.headers['EXT'] = ''
             logger.debug('RES: {}'.format(res))
@@ -1042,7 +1106,17 @@ class DLNAHandler(Handler):
                 cherrypy.response.headers['TIMEOUT'] = TIMEOUT
             elif CALLBACK:
                 logger.error("ADD SUBSCRIBE:!!!!!!!" + service)
-                suburl = re.findall("<(.*?)>", CALLBACK)[0]
+                callback_match = re.fullmatch(r"<([^<>]+)>", CALLBACK.strip())
+                if callback_match is None:
+                    raise cherrypy.HTTPError(status=412)
+                suburl = callback_match.group(1)
+                if not callback_matches_request(suburl, cherrypy.request.remote.ip):
+                    logger.warning(
+                        "Rejected callback URL %s from %s",
+                        suburl,
+                        cherrypy.request.remote.ip,
+                    )
+                    raise cherrypy.HTTPError(status=412)
                 res = self.protocol.add_subscribe(service, suburl, TIMEOUT)
                 cherrypy.response.headers['SID'] = res['SID']
                 cherrypy.response.headers['TIMEOUT'] = res['TIMEOUT']

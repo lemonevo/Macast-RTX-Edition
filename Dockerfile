@@ -1,45 +1,22 @@
-FROM python:3.7-slim-buster
+FROM python:3.12-slim-bookworm
 
-ENV PYPI_URL=https://pypi.tuna.tsinghua.edu.cn
-ENV PYPI_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_INPUT=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-RUN \
-    set -x &&\
-    # install gi to python3.7/site-packages
-    mkdir -p /usr/lib/python3 &&\
-    ln -s /usr/local/lib/python3.7/site-packages /usr/lib/python3/dist-packages &&\
-    # update system
-    apt-get update &&\
-    # install requirements
-    apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
         binutils \
-        python3-gi \
+        gettext \
+        git \
+        libayatana-appindicator3-dev \
         libgtk-3-dev \
-        libappindicator3-dev \
-        upx \
-        git
+        python3-gi
 
+RUN python -m pip install \
+    pip==26.2 \
+    PyInstaller==6.21.0
 
-RUN \
-    # specified a custom URL for PYPI
-    mkdir -p /root/.pip &&\
-    echo "[global]" > /root/.pip/pip.conf &&\
-    echo "index = $PYPI_URL" >> /root/.pip/pip.conf &&\
-    echo "index-url = $PYPI_INDEX_URL" >> /root/.pip/pip.conf &&\
-    echo "trusted-host = $(echo $PYPI_URL | perl -pe 's|^.*?://(.*?)(:.*?)?/.*$|$1|')" >> /root/.pip/pip.conf &&\
-    # install pyinstaller
-    pip install pyinstaller && \
-    mkdir /src/ &&\
-    # build entrypoint.sh
-    echo \#\!/bin/bash -i >> /entrypoint.sh &&\
-    echo >> /entrypoint.sh &&\
-    echo "set -e" >> /entrypoint.sh &&\
-    echo "cd /src" >> /entrypoint.sh &&\
-    echo "echo \"\$@\"" >> /entrypoint.sh &&\
-    echo "sh -c \"\$@\"" >> /entrypoint.sh &&\
-    chmod +x /entrypoint.sh
-
-VOLUME /src/
-WORKDIR /src/
-SHELL ["/bin/bash", "-i", "-c"]
-ENTRYPOINT ["/entrypoint.sh"]
+VOLUME ["/src"]
+WORKDIR /src
+ENTRYPOINT ["/bin/bash", "-lc"]

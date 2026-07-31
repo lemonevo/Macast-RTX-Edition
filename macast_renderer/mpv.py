@@ -16,7 +16,7 @@ import cherrypy
 import gettext
 from enum import Enum
 
-from macast.utils import Setting
+from macast.utils import SETTING_DIR, Setting
 from macast.renderer import Renderer, RendererSetting
 from macast.gui import App, MenuItem
 
@@ -341,7 +341,6 @@ class MPVRenderer(Renderer):
                 '--idle=yes',
                 '--no-terminal',
                 '--on-all-workspaces',
-                '--hwdec=yes',
                 '--save-position-on-quit=yes',
                 '--script-opts=osc-timetotal=yes,osc-layout=bottombar,' +
                 'osc-title=${title},osc-showwindowed=yes,' +
@@ -362,7 +361,7 @@ class MPVRenderer(Renderer):
             params.append('--geometry={}%:{}%'.format(x, y))
 
             # set lua scripts
-            scripts_path = Setting.get_base_path('scripts')
+            scripts_path = os.path.join(SETTING_DIR, 'scripts')
             if os.path.exists(scripts_path):
                 scripts = os.listdir(scripts_path)
                 scripts = filter(lambda s: s.endswith('.lua'), scripts)
@@ -392,10 +391,44 @@ class MPVRenderer(Renderer):
             # set hardware
             hw = Setting.get(SettingProperty.PlayerHW,
                              default=SettingProperty.PlayerHW_Enable.value)
+            rtx_vsr = bool(Setting.get(
+                SettingProperty.RTXVideoVSR,
+                default=SettingProperty.RTXVideoVSR_Enable.value,
+            ))
+            rtx_hdr = bool(Setting.get(
+                SettingProperty.RTXVideoHDR,
+                default=SettingProperty.RTXVideoHDR_Disable.value,
+            ))
+
             if hw == SettingProperty.PlayerHW_Disable.value:
-                params.remove('--hwdec=yes')
+                params.append('--hwdec=no')
+            elif os.name == 'nt' and (rtx_vsr or rtx_hdr):
+                # d3d11vpp is the processing path used by NVIDIA RTX Video.
+                params.append('--hwdec=d3d11va')
             elif hw == SettingProperty.PlayerHW_Force.value:
+                params.append('--hwdec=auto-safe')
                 params.append('--macos-force-dedicated-gpu=yes')
+            else:
+                params.append('--hwdec=auto-safe')
+
+            if os.name == 'nt' and (rtx_vsr or rtx_hdr):
+                rtx_script = os.path.join(
+                    os.path.dirname(os.path.dirname(__file__)),
+                    'macast',
+                    'scripts',
+                    'rtx_video.lua',
+                )
+                params.extend([
+                    '--vo=gpu-next',
+                    '--gpu-api=d3d11',
+                    '--script={}'.format(rtx_script),
+                    '--script-opts-append=macast_rtx-vsr={},macast_rtx-hdr={}'.format(
+                        'yes' if rtx_vsr else 'no',
+                        'yes' if rtx_hdr else 'no',
+                    ),
+                ])
+                if rtx_hdr:
+                    params.append('--target-colorspace-hint=yes')
 
             # start mpv
             logger.info("mpv starting")
@@ -505,12 +538,22 @@ class SettingProperty(Enum):
 
     PlayerDefaultVolume = 500
 
+    RTXVideoVSR = 600
+    RTXVideoVSR_Disable = 0
+    RTXVideoVSR_Enable = 1
+
+    RTXVideoHDR = 610
+    RTXVideoHDR_Disable = 0
+    RTXVideoHDR_Enable = 1
+
 
 class MPVRendererSetting(RendererSetting):
     def __init__(self):
         self.playerPositionItem = None
         self.playerSizeItem = None
         self.playerHWItem = None
+        self.rtxVSRItem = None
+        self.rtxHDRItem = None
         Setting.load()
         self.setting_player_size = Setting.get(SettingProperty.PlayerSize,
                                                SettingProperty.PlayerSize_Normal.value)
@@ -520,6 +563,14 @@ class MPVRendererSetting(RendererSetting):
                                              SettingProperty.PlayerHW_Enable.value)
         self.setting_player_ontop = Setting.get(SettingProperty.PlayerOntop,
                                                 SettingProperty.PlayerOntop_True.value)
+        self.setting_rtx_vsr = Setting.get(
+            SettingProperty.RTXVideoVSR,
+            SettingProperty.RTXVideoVSR_Enable.value,
+        )
+        self.setting_rtx_hdr = Setting.get(
+            SettingProperty.RTXVideoHDR,
+            SettingProperty.RTXVideoHDR_Disable.value,
+        )
 
     def build_menu(self):
         self.playerPositionItem = MenuItem(_("Player Position"),
@@ -539,6 +590,24 @@ class MPVRendererSetting(RendererSetting):
                                            _("Fullscreen")
                                        ], self.on_renderer_size_clicked))
         self.playerOntopItem = MenuItem(_("Player Ontop"), self.on_renderer_ontop_clicked)
+        rtx_items = []
+        if sys.platform == 'win32':
+            self.rtxVSRItem = MenuItem(
+                "RTX Video Super Resolution",
+                self.on_rtx_vsr_clicked,
+                checked=bool(self.setting_rtx_vsr),
+            )
+            self.rtxHDRItem = MenuItem(
+                "RTX Video HDR",
+                self.on_rtx_hdr_clicked,
+                checked=bool(self.setting_rtx_hdr),
+            )
+            rtx_items = [
+                None,
+                MenuItem("NVIDIA RTX Video", enabled=False),
+                self.rtxVSRItem,
+                self.rtxHDRItem,
+            ]
 
         has_dedicated_gpu = False
         # Force dedicated GPU only works on MacOS
@@ -582,7 +651,7 @@ class MPVRendererSetting(RendererSetting):
             self.playerSizeItem,
             self.playerHWItem,
             self.playerOntopItem,
-        ]
+        ] + rtx_items
 
     def reloadPlayer(self):
         cherrypy.engine.publish('app_notify',
@@ -594,6 +663,16 @@ class MPVRendererSetting(RendererSetting):
     def on_renderer_ontop_clicked(self, item):
         item.checked = not item.checked
         Setting.set(SettingProperty.PlayerOntop, 1 if item.checked else 0)
+        self.reloadPlayer()
+
+    def on_rtx_vsr_clicked(self, item):
+        item.checked = not item.checked
+        Setting.set(SettingProperty.RTXVideoVSR, 1 if item.checked else 0)
+        self.reloadPlayer()
+
+    def on_rtx_hdr_clicked(self, item):
+        item.checked = not item.checked
+        Setting.set(SettingProperty.RTXVideoHDR, 1 if item.checked else 0)
         self.reloadPlayer()
 
     def on_renderer_position_clicked(self, item):

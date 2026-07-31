@@ -1,0 +1,6 @@
+-r windows.txt
+Babel==2.18.0
+PyInstaller==6.21.0
+pip==26.2
+pip-audit==2.10.1
+setuptools==83.0.0

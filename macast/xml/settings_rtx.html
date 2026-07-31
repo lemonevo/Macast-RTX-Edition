@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <title>Macast RTX Edition</title>
+    <link rel="icon" href="/assets/icon.png">
+    <link rel="stylesheet" href="/assets/settings.css">
+    <script defer src="/assets/settings.js"></script>
+</head>
+<body>
+<div class="shell">
+    <header class="masthead">
+        <div>
+            <p class="eyebrow">DLNA MEDIA RENDERER</p>
+            <h1>Macast <span>RTX Edition</span></h1>
+            <p class="lede">让 OK影视、TVBox 等 DLNA 控制端把视频投到电脑，并由新版 mpv 接入 NVIDIA RTX Video 处理链路。</p>
+        </div>
+        <div class="status-card">
+            <span class="status-dot" aria-hidden="true"></span>
+            <div>
+                <small>本地服务</small>
+                <strong id="version">正在连接</strong>
+            </div>
+        </div>
+    </header>
+
+    <nav class="tabs" aria-label="设置页导航">
+        <button type="button" data-page="1">概览</button>
+        <button type="button" data-page="2">高级设置</button>
+        <button type="button" data-page="3">日志</button>
+        <button type="button" data-page="4">帮助</button>
+    </nav>
+
+    <main>
+        <section class="panel" data-panel="1">
+            <div class="feature-grid">
+                <article class="feature">
+                    <span class="feature-index">01</span>
+                    <h2>RTX VSR</h2>
+                    <p>在托盘菜单中启用。程序只在视频确实需要放大且源分辨率不高于 1440p 时加入 NVIDIA 超分辨率滤镜。</p>
+                </article>
+                <article class="feature">
+                    <span class="feature-index">02</span>
+                    <h2>RTX Video HDR</h2>
+                    <p>先在 Windows 中开启 HDR，再从托盘菜单启用。已是 HDR 的视频会由 NVIDIA 处理器自动跳过转换。</p>
+                </article>
+                <article class="feature">
+                    <span class="feature-index">03</span>
+                    <h2>本机管理</h2>
+                    <p>设置、日志与插件信息只允许从本机访问。远程下载并执行插件的旧入口已经移除。</p>
+                </article>
+            </div>
+
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">LOCAL COMPONENTS</p>
+                    <h2>当前组件</h2>
+                </div>
+                <button type="button" class="secondary" id="refresh-components">刷新</button>
+            </div>
+            <div id="components" class="component-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel" data-panel="2" hidden>
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">ADVANCED</p>
+                    <h2>高级设置</h2>
+                </div>
+                <span class="local-badge">仅限本机</span>
+            </div>
+            <p class="muted">这里直接编辑 Macast 的 JSON 配置。日常切换 RTX VSR、HDR、窗口位置和硬解，请优先使用托盘菜单。</p>
+            <label for="settings-json">macast_setting.json</label>
+            <textarea id="settings-json" spellcheck="false" aria-describedby="settings-message"></textarea>
+            <div class="actions">
+                <button type="button" id="save-settings">保存并重载</button>
+                <span id="settings-message" class="message" role="status"></span>
+            </div>
+        </section>
+
+        <section class="panel" data-panel="3" hidden>
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">DIAGNOSTICS</p>
+                    <h2>运行日志</h2>
+                </div>
+                <button type="button" class="secondary" id="refresh-log">刷新</button>
+            </div>
+            <pre id="log-output" tabindex="0">正在读取日志……</pre>
+        </section>
+
+        <section class="panel help" data-panel="4" hidden>
+            <p class="eyebrow">QUICK START</p>
+            <h2>使用说明</h2>
+            <ol>
+                <li>保持手机和电脑处于同一局域网，并允许程序通过 Windows 专用网络防火墙。</li>
+                <li>启动后在系统托盘找到 Macast RTX Edition。</li>
+                <li>在 OK影视或 TVBox 中点击投屏，选择名称中带有 <code>Macast RTX</code> 的设备。</li>
+                <li>通过托盘菜单分别启用 RTX Video Super Resolution 和 RTX Video HDR。</li>
+                <li>在 NVIDIA App 的“系统 → 视频”中确认增强状态是否处于活动。</li>
+            </ol>
+            <div class="notice">
+                <strong>HDR 前置条件</strong>
+                <p>需要 RTX 显卡、支持 HDR 的显示器、较新的 NVIDIA 驱动，并在 Windows“设置 → 系统 → 显示 → HDR”中打开 HDR。</p>
+            </div>
+            <p>源码、构建方法与许可证说明见
+                <a href="https://github.com/ccjjxx99/Macast-RTX-Edition" target="_blank" rel="noreferrer">GitHub 仓库</a>。
+            </p>
+        </section>
+    </main>
+
+    <footer>
+        <span>Macast RTX Edition</span>
+        <span>GPL-3.0-or-later · Based on xfangfang/Macast</span>
+    </footer>
+</div>
+</body>
+</html>

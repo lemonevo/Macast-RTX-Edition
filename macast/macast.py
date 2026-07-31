@@ -4,7 +4,6 @@ import os
 import re
 import sys
 import time
-import json
 import cherrypy
 import logging
 import threading
@@ -12,6 +11,7 @@ import requests
 import pyperclip
 import gettext
 import importlib
+from packaging.version import InvalidVersion, Version
 
 from .utils import SettingProperty, SETTING_DIR, notify_error, format_class_name
 from .gui import App, MenuItem, Platform
@@ -211,7 +211,7 @@ class Macast(App):
         icon_path = os.path.join(os.path.dirname(__file__), Macast.ICON_MAP[self.setting_menubar_icon])
         template = None if self.setting_menubar_icon == 0 else True
         self.copy_menuitem = None
-        super(Macast, self).__init__("Macast",
+        super(Macast, self).__init__("Macast RTX Edition",
                                      icon_path,
                                      self.build_app_menu(),
                                      template
@@ -344,22 +344,32 @@ class Macast(App):
         self.service.run_async()
 
     def check_update(self, verbose=True):
-        release_url = 'https://github.com/xfangfang/Macast/releases/latest'
-        api_url = 'https://api.github.com/repos/xfangfang/Macast/releases/latest'
+        release_url = 'https://github.com/ccjjxx99/Macast-RTX-Edition/releases/latest'
+        api_url = 'https://api.github.com/repos/ccjjxx99/Macast-RTX-Edition/releases/latest'
         try:
-            res = json.loads(requests.get(api_url).text)
-            online_version = re.findall(r'(\d+\.*\d+)', res['tag_name'])[0]
+            response = requests.get(
+                api_url,
+                headers={
+                    'Accept': 'application/vnd.github+json',
+                    'User-Agent': 'Macast-RTX-Edition',
+                },
+                timeout=(3.05, 10),
+            )
+            response.raise_for_status()
+            res = response.json()
+            online_version = Version(res['tag_name'].lstrip('v'))
+            current_version = Version(Setting.get_version())
 
             logger.info("tag_name: {}".format(res['tag_name']))
 
-            if float(Setting.get_version()) < float(online_version):
+            if current_version < online_version:
                 self.dialog(_("Macast New Update {}").format(res['tag_name']),
                             lambda: self.open_browser(release_url),
                             ok="Update")
             else:
                 if verbose:
                     self.notification("Macast", _("You're up to date."))
-        except Exception as e:
+        except (InvalidVersion, KeyError, requests.RequestException) as e:
             logger.error("get update info error: {}".format(e))
 
     # The followings are the callback function of program event

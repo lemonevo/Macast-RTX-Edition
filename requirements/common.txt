@@ -1,8 +1,11 @@
-appdirs
-cherrypy
-lxml
-pillow
-requests
-netifaces
-git+https://github.com/xfangfang/pystray.git
-git+https://github.com/xfangfang/pyperclip.git
+# Runtime dependencies shared by the source distribution.
+CherryPy==18.10.0
+lxml==6.1.1
+netifaces-plus==0.12.5
+packaging==26.2
+platformdirs==4.11.0
+requests==2.34.2
+
+Pillow==12.3.0; platform_system != "Darwin"
+pyperclip==1.11.0
+pystray==0.19.5; platform_system != "Darwin"
