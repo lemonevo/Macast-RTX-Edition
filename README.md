@@ -1,182 +1,114 @@
-# 📺 Macast RTX Edition
+# Macast RTX Edition
 
 [![Build Windows](https://github.com/lemonevo/Macast-RTX-Edition/actions/workflows/build-windows.yml/badge.svg)](https://github.com/lemonevo/Macast-RTX-Edition/actions/workflows/build-windows.yml)
 [![GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-76b900)](LICENSE)
-[![mpv git 63ada87ec](https://img.shields.io/badge/mpv-git%2063ada87ec-76b900)](https://github.com/mpv-player/mpv/releases/tag/git-release)
 
-Macast RTX Edition 是一款支持 Windows、macOS 和 Linux 的轻量级 DLNA/UPnP 媒体接收器。它让电脑出现在局域网的投放设备列表中，接收来自手机、平板、电脑、家庭服务器及其他 DLNA 控制端的视频、音乐和图片，并交给 mpv 播放。
+让 Windows、macOS 或 Linux 电脑成为局域网中的 DLNA/UPnP 投屏接收端。手机、平板或其他 DLNA 控制端发送媒体地址和播放指令，电脑用 [mpv](https://mpv.io/) 播放视频、音乐或图片。它接收媒体地址，不提供屏幕镜像。
 
-本项目从 [ccjjxx99/Macast-RTX-Edition](https://github.com/ccjjxx99/Macast-RTX-Edition) 克隆并继续开发。感谢 ccjjxx99 的 RTX Edition 工作，也感谢 [xfangfang/Macast](https://github.com/xfangfang/Macast) 的原始项目及所有贡献者。
+本仓库是 [ccjjxx99/Macast-RTX-Edition](https://github.com/ccjjxx99/Macast-RTX-Edition) 的 Fork，加入了 macOS、Linux 支持和稳定性修复。**NVIDIA RTX Video VSR/HDR 仅适用于受支持的 Windows 显卡**；macOS 和 Linux 使用普通 mpv 播放。
 
-程序常驻系统托盘，不需要媒体库、账号或内容服务。Windows 上受支持的 NVIDIA RTX 显卡还可以启用 RTX Video Super Resolution 和 RTX Video HDR。
+## 平台支持
 
-[查看源码](https://github.com/lemonevo/Macast-RTX-Edition) · [报告问题](https://github.com/lemonevo/Macast-RTX-Edition/issues) · [安全策略](SECURITY.md)
-
-## ✨ 核心功能
-
-### 📡 DLNA 媒体接收
-
-- 在局域网中注册为标准 DLNA/UPnP Media Renderer。
-- 接收常见 DLNA 控制端发送的网络视频、音频、图片及本地媒体地址。
-- 支持播放、暂停、停止、音量调节和进度跳转等远程控制指令。
-- 电脑根据收到的地址读取媒体，不需要逐帧镜像控制端屏幕；如果控制端同时提供文件或代理服务，它仍需保持在线。
-
-### 🎬 mpv 播放内核
-
-- Windows 单文件构建内置 mpv `v0.41.0-dev-g63ada87ec`；macOS 和 Linux 使用系统安装的 mpv。
-- 支持硬件解码、全屏、窗口置顶和播放位置记忆。
-- 可以设置窗口尺寸与屏幕位置。
-- 可从托盘菜单复制当前媒体地址，方便调试或交给其他播放器。
-- 支持用户自己的 mpv 配置和脚本。
-
-### 🟢 NVIDIA RTX Video
-
-- RTX Video Super Resolution（VSR）与 RTX Video HDR 可以分别开关。
-- 启动时自动检测 Windows 显卡；检测到受支持的 NVIDIA RTX GPU 时，新配置默认开启 VSR 与 HDR。
-- 未检测到受支持的 RTX GPU 时，两项功能自动关闭，托盘菜单会显示检测状态且不会加载 RTX 滤镜。
-- VSR 根据视频尺寸和播放窗口自动计算放大倍率，只在视频确实被放大时启用。
-- 默认处理最高 1440p 的输入，放大倍率限制在 `1.05x`～`4x`。
-- 使用 `gpu-next`、D3D11、`d3d11va` 和 `d3d11vpp` 接入 NVIDIA 视频处理链路。
-- 原生 HDR 视频不会再次执行 SDR 转 HDR。
-
-### 🧩 托盘与本地设置
-
-- 启停 DLNA 服务、开机启动和自动检查更新。
-- 切换 Renderer、Protocol、硬件解码、窗口大小、窗口位置与置顶状态。
-- 本地设置页可查看组件信息、编辑高级配置和读取运行日志。
-- 无框架设置页面，全部资源随程序本地提供，不依赖 CDN。
-
-## 🔄 工作方式
-
-```mermaid
-flowchart LR
-    A["DLNA 控制端<br/>手机、平板、电脑、家庭服务器"] -->|媒体地址与播放指令| B["Macast RTX Edition"]
-    B --> C["mpv 播放器"]
-    C --> D["硬件解码与播放窗口"]
-    D --> E["电脑显示器或音频设备"]
-```
-
-Macast RTX Edition 是接收端，不是屏幕镜像工具。控制端发送媒体地址和播放指令，电脑负责连接媒体服务器并完成解码、渲染和声音输出。
-
-## 🚀 安装与运行
-
-| 系统 | 准备工作 | 从源码运行 | 可构建产物 |
+| 平台 | 从源码运行 | 本仓库的打包方式 | 播放器 |
 | --- | --- | --- | --- |
-| Windows | Python 3.12；源码运行时需要 mpv 在 `PATH` | `python Macast.py` | 已验证的 Windows EXE 构建脚本 |
-| macOS | Python 3.10+、系统 mpv | `python Macast.py` | 当前推荐源码安装 |
-| Linux | Python 3.10+、系统 mpv、桌面托盘依赖 | `python Macast.py` | Linux 单文件构建脚本 |
+| Windows | 支持 | 可构建单文件 EXE | 源码运行需自行安装 mpv；构建的 EXE 内置 mpv |
+| macOS | 支持 | 暂无经过验证的 `.app`/`.dmg` | 需安装 mpv |
+| Linux | 支持 | 可在 Linux 上构建单文件程序 | 需安装 mpv；图形界面还需系统托盘依赖 |
 
-三个系统的虚拟环境、依赖安装和构建命令见 [中文构建指南](docs/Build_ZH.md) 或 [英文开发文档](docs/Development.md)。安装 Python 包后，也可运行 `macast-rtx-gui`；没有图形桌面时使用 `macast-rtx-cli`。电脑与 DLNA 控制端需位于同一局域网，程序保持运行时才会出现在投屏设备列表中。
+需要 **Python 3.10 或更新版本**。三个平台都支持在有图形桌面的环境中运行托盘界面；没有图形桌面时可使用命令行入口。Windows 构建脚本已验证，macOS 目前推荐源码运行，Linux 单文件构建应在与目标电脑兼容的 Linux 系统上进行。
 
-原项目的 [Windows Releases](https://github.com/ccjjxx99/Macast-RTX-Edition/releases/latest) 不包含本仓库后续的跨平台修改。本仓库用户可按文档从源码运行；Linux 单文件构建仍需要目标机器安装 mpv 和托盘依赖。
+## 主要功能
 
-## 🟢 RTX 设置
+- 接收 DLNA 控制端发送的视频、音频和图片地址，支持播放、暂停、音量和进度控制。
+- 使用 mpv 播放，可从托盘菜单调整窗口大小、位置、置顶和硬件解码。
+- 提供本机设置页、运行日志和自定义 Renderer、Protocol、mpv 脚本支持。
 
-程序启动时会通过 NVIDIA 驱动工具和 Windows 显示设备信息检测显卡。检测到受支持的 NVIDIA RTX GPU 后，新配置默认开启 RTX VSR 与 RTX Video HDR，用户仍可在托盘菜单中分别关闭。未检测到受支持显卡时，两项功能保持关闭并显示不可用提示，DLNA 接收和普通 mpv 播放不受影响。
+## 快速开始
 
-升级已有配置时会尽量保留已经保存的 RTX 开关选择；如果显卡能力从支持变为不支持，两项功能会自动关闭。
+先将本仓库克隆到电脑，然后按自己的系统执行下面的命令：
 
-启用 RTX 功能需要：
-
-- Windows 10/11 64 位；
-- NVIDIA GeForce RTX 显卡和较新的 Game Ready 或 Studio 驱动；
-- RTX Video HDR 需要 HDR 显示器，并在 Windows 显示设置中打开 HDR；
-- 播放内容需要满足 NVIDIA 驱动的 RTX Video 处理条件。
-
-可以在 NVIDIA App 的“系统 → 视频”页面查看 VSR 和 HDR 是否处于活动状态。功能未激活时，先确认播放窗口正在放大视频、mpv 使用的是 NVIDIA 显卡，并检查驱动中的视频增强开关。
-
-## ⚙️ 设置与数据
-
-托盘菜单中的 `Advanced Setting` 会打开本机设置页。页面和相关 API 仅接受来自 `127.0.0.1` 或 `::1` 的请求。
-
-配置目录通常为：
-
-```text
-%LOCALAPPDATA%\ccjjxx99\Macast-RTX-Edition   (Windows)
-~/Library/Application Support/Macast-RTX-Edition   (macOS)
-~/.config/Macast-RTX-Edition                    (Linux)
+```sh
+git clone https://github.com/lemonevo/Macast-RTX-Edition.git
+cd Macast-RTX-Edition
 ```
 
-该目录保存高级设置、用户脚本和运行日志。自定义 Renderer、Protocol 或 mpv 脚本会以当前用户权限运行，只应加载自己信任的代码。
+### Windows
 
-## 🔒 安全与隐私
-
-- 不需要账号，不上传媒体库或播放记录。
-- 管理接口仅限本机访问，并使用 CSRF 校验。
-- 局域网输入的 XML 禁止实体解析、DTD 和外部网络访问。
-- UPnP 事件回调被限制到发起订阅的设备地址。
-- 构建流程固定 GitHub Actions 提交和 mpv 下载校验值。
-- Windows GitHub Actions 构建会用 `pip-audit` 检查 Python 依赖。
-
-投放时，电脑需要直接访问控制端提供的媒体地址。地址、请求权限或网络路由不可用时，播放器可能无法打开内容；部分媒体服务器也会限制进度跳转或临时链接的有效时间。
-
-## 常见问题
-
-<details>
-<summary>设备列表中找不到 Macast RTX Edition</summary>
-
-- 确认程序仍在系统托盘运行。
-- 将 Windows 网络类型设为“专用网络”，并允许程序通过专用网络防火墙。
-- 确认两台设备处于同一局域网，且路由器没有开启 AP 隔离、客户端隔离或访客网络。
-- VPN、多网卡和虚拟网卡可能影响 SSDP 广播，可暂时切换到实际使用的局域网接口排查。
-
-</details>
-
-<details>
-<summary>视频能播放，但不能拖动进度</summary>
-
-进度跳转需要媒体服务器、传输协议和控制端共同支持。可以先用 mpv 键盘快捷键测试，再更换媒体地址或线路。直播流、临时代理地址以及缺少时间索引的媒体可能无法跳转。
-
-</details>
-
-<details>
-<summary>RTX VSR 或 HDR 没有激活</summary>
-
-确认 NVIDIA App 已打开对应功能。VSR 只在视频发生放大时启用；HDR 还需要 Windows HDR 已开启。笔记本用户应确认播放进程运行在 NVIDIA 独立显卡上。
-
-</details>
-
-## 🧰 构建 Windows EXE
-
-完整的三平台命令见 [中文构建指南](docs/Build_ZH.md)。Windows 构建推荐使用 Python 3.12。脚本不会覆盖已经存在的输出目录；重复构建时请指定新的 `OutputRoot`。
+安装 Python 3.10+ 和 mpv，并将 `mpv.exe` 所在目录加入 `PATH`。在 PowerShell 中执行：
 
 ```powershell
-py -3.12 -m venv .venv-rtx
-.\.venv-rtx\Scripts\python.exe -m pip install -r requirements\build-windows.txt
-.\scripts\build_windows.ps1 -Python .\.venv-rtx\Scripts\python.exe
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe Macast.py
 ```
 
-默认产物：
+上例使用 Python 3.12；如果安装的是其他受支持版本，替换 `py -3.12`。需要生成内置 mpv 的 EXE，请看[中文构建指南](docs/Build_ZH.md)。原项目的 [Windows Releases](https://github.com/ccjjxx99/Macast-RTX-Edition/releases/latest) 不包含本仓库的跨平台修改。
 
-```text
-.build\windows-v1.1.1\dist\Macast-RTX-Edition-v1.1.1.exe
-.build\windows-v1.1.1\dist\SHA256SUMS.txt
+### macOS
+
+安装 Python 3.10+ 和 mpv（例如使用 Homebrew 安装 mpv：`brew install mpv`），然后执行：
+
+```sh
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
+python Macast.py
 ```
 
-构建脚本下载官方 mpv `v0.41.0-dev-g63ada87ec` Windows x64 MSVC 包，并核对固定的 SHA-256：
+应用会显示在菜单栏。仓库中的旧 `setup_py2app.py` 尚未完成当前版本的 `.app` 构建验证。
 
-```text
-B195E12366FC95EABF22A0D409C160069BB222371C7F4570C2CEF7B217EE80F7
+### Linux
+
+以 Ubuntu/Debian 为例，先安装 mpv 和托盘依赖，再创建能读取系统 `gi` 模块的虚拟环境：
+
+```sh
+sudo apt install mpv python3-gi gir1.2-gtk-3.0 \
+  libayatana-appindicator3-1 gir1.2-ayatanaappindicator3-0.1
+python3 -m venv --system-site-packages .venv
+. .venv/bin/activate
+python -m pip install -e .
+python Macast.py
 ```
 
-手动执行依赖审计：
+其他发行版需安装对应的 mpv、GTK、PyGObject 和 AppIndicator 包。没有系统托盘时，可在安装后运行 `macast-rtx-cli`。Linux 单文件构建步骤见[中文构建指南](docs/Build_ZH.md)；生成的程序仍需目标电脑安装 mpv。
 
-```powershell
-.\.venv-rtx\Scripts\python.exe -m pip_audit -r requirements\windows.txt
-```
+安装完成后也可以使用 `macast-rtx-gui` 启动托盘界面。源码可编辑安装需要中文菜单时，请按[构建指南](docs/Build_ZH.md)编译翻译文件。
 
-GitHub Actions 会在提交和 Pull Request 上执行依赖审计与 Windows 构建。推送符合 `v*.*.*` 格式的标签时，工作流会创建 Release 并上传 EXE 与 `SHA256SUMS.txt`。
+## 如何投屏
 
-## 参与项目
+1. 保持 Macast 运行，让电脑和控制端连接同一个局域网。
+2. 在手机或其他 DLNA 控制端的设备列表中选择 Macast RTX Edition。
+3. 发送媒体，电脑会通过 mpv 播放。可从托盘菜单调整窗口大小、位置、置顶和硬件解码。
 
-Bug、兼容性报告和功能建议可以提交到 [Issues](https://github.com/lemonevo/Macast-RTX-Edition/issues)。提交问题时，请尽量附上操作系统、桌面环境、mpv 版本、控制端类型、媒体协议以及相关日志；RTX 问题还需提供显卡与驱动版本。
+投屏时电脑需要能访问控制端提供的媒体地址。如果控制端兼做媒体服务器或代理，播放期间它也需要保持在线。进度跳转取决于媒体服务器、传输协议和控制端是否支持。
 
-Pull Request 请保持改动范围清晰，并说明实际验证条件。涉及播放器、DLNA 协议或 RTX 处理链路的修改，建议同时提供可复现的媒体样例或日志。
+### 搜不到设备？
 
-## 许可证与致谢
+- 确认程序仍在运行，电脑和控制端处于同一局域网。
+- 检查防火墙是否允许 Macast 和 UDP 1900；Windows 可先将网络类型设为“专用网络”。
+- 检查路由器是否开启访客网络、AP 隔离或客户端隔离。
+- VPN、虚拟网卡和多网卡可能影响 SSDP 发现；可暂时切换到实际使用的局域网接口排查。
 
-本项目的直接来源是 [ccjjxx99/Macast-RTX-Edition](https://github.com/ccjjxx99/Macast-RTX-Edition)，其上游项目是 [xfangfang/Macast](https://github.com/xfangfang/Macast)。感谢两位项目作者及社区贡献者提供的基础代码与持续维护。本项目继续使用 [GNU GPL v3 或更高版本](LICENSE)；发布二进制时，对应源码也会保留在本仓库。
+## Windows RTX Video
 
-mpv、FFmpeg、libplacebo 等组件使用各自的许可证。来源、版本与再分发说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+在受支持的 Windows 10/11 64 位电脑上，程序会检测 NVIDIA GeForce RTX 显卡，并提供 RTX Video Super Resolution（VSR）和 RTX Video HDR 开关。新配置检测到支持的显卡时默认开启；无法使用时会关闭 RTX 处理，普通 DLNA 播放不受影响。
 
-> 本项目只负责接收和播放媒体，不提供内容、媒体索引或解析服务。请确认所访问内容及其来源符合当地法律和服务条款。
+VSR 仅在视频被放大时生效。RTX Video HDR 还需要 HDR 显示器以及 Windows HDR 设置。需要排查时，可检查 NVIDIA 驱动中的视频增强设置，并确认 mpv 正在使用 NVIDIA 显卡。
+
+## 配置与构建
+
+托盘菜单中的 `Advanced Setting` 打开本机设置页；用户脚本、配置和日志保存在系统配置目录中：
+
+| 系统 | 配置目录 |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%\ccjjxx99\Macast-RTX-Edition` |
+| macOS | `~/Library/Application Support/Macast-RTX-Edition` |
+| Linux | `~/.config/Macast-RTX-Edition` |
+
+完整的三平台依赖、Windows EXE、Linux 单文件构建和翻译命令见[中文构建指南](docs/Build_ZH.md)；开发细节见[英文开发文档](docs/Development.md)。自定义 Renderer、Protocol 和 mpv 脚本会以当前用户权限运行，请只加载可信代码。
+
+## 来源、许可证与感谢
+
+本项目直接基于 [ccjjxx99/Macast-RTX-Edition](https://github.com/ccjjxx99/Macast-RTX-Edition)，其上游是 [xfangfang/Macast](https://github.com/xfangfang/Macast)。感谢 ccjjxx99、xfangfang 和所有贡献者提供基础代码及持续维护。本项目继续使用 [GNU GPL v3 或更高版本](LICENSE)；第三方组件的来源和许可证见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+问题和建议请提交到[本仓库 Issues](https://github.com/lemonevo/Macast-RTX-Edition/issues)。提交兼容性问题时，请附上操作系统、桌面环境、mpv 版本和相关日志。
