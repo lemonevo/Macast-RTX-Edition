@@ -29,6 +29,24 @@ logger = logging.getLogger("MPVRenderer")
 logger.setLevel(logging.INFO)
 
 
+def get_player_setting(property):
+    """Read a player choice with one platform default and range check."""
+    if property == SettingProperty.PlayerSize:
+        default = (SettingProperty.PlayerSize_Large.value
+                   if sys.platform in ('darwin', 'linux')
+                   else SettingProperty.PlayerSize_Normal.value)
+        maximum = SettingProperty.PlayerSize_FullScreen.value
+    elif property == SettingProperty.PlayerPosition:
+        default = (SettingProperty.PlayerPosition_Center.value
+                   if sys.platform == 'darwin'
+                   else SettingProperty.PlayerPosition_RightTop.value)
+        maximum = SettingProperty.PlayerPosition_Center.value
+    else:
+        raise ValueError('Unsupported player setting')
+    value = Setting.get(property, default)
+    return value if type(value) is int and 0 <= value <= maximum else default
+
+
 def initialize_rtx_video_settings(capability):
     """Apply hardware-aware defaults while preserving stable user choices."""
     Setting.load()
@@ -152,8 +170,7 @@ class MPVRenderer(Renderer):
         """ data : string
         """
         options = {'start': start}
-        player_size = Setting.get(SettingProperty.PlayerSize,
-                                  default=SettingProperty.PlayerSize_Normal.value)
+        player_size = get_player_setting(SettingProperty.PlayerSize)
         if player_size == SettingProperty.PlayerSize_FullScreen.value:
             options['fullscreen'] = 'yes'
         self.send_command(['loadfile', url, 'replace', '-1',
@@ -347,6 +364,9 @@ class MPVRenderer(Renderer):
                 self.set_observe()
             except Exception as e:
                 logger.error("mpv ipc socket reconnecting: {}".format(str(e)))
+                if self.ipc_sock is not None:
+                    self.ipc_sock.close()
+                    self.ipc_sock = None
                 continue
             res = b''
             msgs = None
@@ -403,8 +423,7 @@ class MPVRenderer(Renderer):
                 params.append('--ontop')
 
             # set player position
-            player_position = Setting.get(SettingProperty.PlayerPosition,
-                                          default=SettingProperty.PlayerPosition_RightTop.value)
+            player_position = get_player_setting(SettingProperty.PlayerPosition)
             player_position_data = [[2, 5], [2, 98], [98, 5], [98, 98], [50, 50]]
             x = player_position_data[player_position][0]
             y = player_position_data[player_position][1]
@@ -420,8 +439,7 @@ class MPVRenderer(Renderer):
                     params.append('--script={}'.format(path))
 
             # set player size
-            player_size = Setting.get(SettingProperty.PlayerSize,
-                                      default=SettingProperty.PlayerSize_Normal.value)
+            player_size = get_player_setting(SettingProperty.PlayerSize)
             if player_size <= SettingProperty.PlayerSize_Large.value:
                 params.append('--autofit={}%'.format(
                     int(15 - 2.5 * player_size + 7.5 * player_size ** 2)))
@@ -462,7 +480,8 @@ class MPVRenderer(Renderer):
                 params.append('--hwdec=d3d11va')
             elif hw == SettingProperty.PlayerHW_Force.value:
                 params.append('--hwdec=auto-safe')
-                params.append('--macos-force-dedicated-gpu=yes')
+                if sys.platform == 'darwin':
+                    params.append('--macos-force-dedicated-gpu=yes')
             else:
                 params.append('--hwdec=auto-safe')
 
@@ -617,10 +636,8 @@ class MPVRendererSetting(RendererSetting):
         self.rtx_capability = detect_rtx_video_capability()
         self.rtx_notice_shown = False
         Setting.load()
-        self.setting_player_size = Setting.get(SettingProperty.PlayerSize,
-                                               SettingProperty.PlayerSize_Normal.value)
-        self.setting_player_position = Setting.get(SettingProperty.PlayerPosition,
-                                                   SettingProperty.PlayerPosition_RightTop.value)
+        self.setting_player_size = get_player_setting(SettingProperty.PlayerSize)
+        self.setting_player_position = get_player_setting(SettingProperty.PlayerPosition)
         self.setting_player_hw = Setting.get(SettingProperty.PlayerHW,
                                              SettingProperty.PlayerHW_Enable.value)
         self.setting_player_ontop = Setting.get(SettingProperty.PlayerOntop,
@@ -716,7 +733,7 @@ class MPVRendererSetting(RendererSetting):
         else:
             self.playerHWItem = MenuItem(_("Hardware Decode"),
                                          self.on_renderer_hw_toggled)
-            if self.setting_player_hw != SettingProperty.PlayerHW_Disable:
+            if self.setting_player_hw != SettingProperty.PlayerHW_Disable.value:
                 self.playerHWItem.checked = True
         self.playerPositionItem.items()[self.setting_player_position].checked = True
         self.playerSizeItem.items()[self.setting_player_size].checked = True
@@ -738,7 +755,10 @@ class MPVRendererSetting(RendererSetting):
         cherrypy.engine.publish('reload_renderer')
 
     def take_startup_notice(self):
-        if self.rtx_capability.supported or self.rtx_notice_shown:
+        # RTX Video is a Windows/NVIDIA feature.  Do not show an
+        # "unavailable" notice on macOS or Linux; those platforms simply use
+        # their normal mpv rendering path.
+        if sys.platform != 'win32' or self.rtx_capability.supported or self.rtx_notice_shown:
             return None
         self.rtx_notice_shown = True
         return self.rtx_capability.unavailable_notice

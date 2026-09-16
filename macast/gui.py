@@ -1,5 +1,6 @@
 # Copyright (c) 2021 by xfangfang. All Rights Reserved.
 
+import os
 import sys
 import logging
 import subprocess
@@ -8,8 +9,16 @@ from .utils import Setting
 
 if sys.platform == 'darwin':
     import rumps
+    from AppKit import NSApplication, NSApplicationActivationPolicyAccessory
 else:
-    import pystray
+    try:
+        import pystray
+    except Exception as exc:
+        # pystray may fail while probing X11/GTK when CLI runs over SSH.
+        # Keep the module importable so the headless CLI still works.
+        pystray = None
+        logger = logging.getLogger("gui")
+        logger.warning("System tray unavailable: %s", exc)
     import webbrowser
     from PIL import Image
 
@@ -116,8 +125,24 @@ class App:
                                  menu=self._build_menu_rumps(self.menu),
                                  template=self.template,
                                  quit_button=None)
+            # Macast is a menu-bar utility, not a regular foreground app.
+            # Accessory activation keeps it out of the Dock while retaining
+            # its status-bar menu and notification support.
+            NSApplication.sharedApplication().setActivationPolicy_(
+                NSApplicationActivationPolicyAccessory
+            )
             rumps.debug_mode(True)
         else:
+            if pystray is None:
+                raise RuntimeError(
+                    "Linux system tray unavailable; set DISPLAY or use CLI mode")
+            if (sys.platform == 'linux' and os.environ.get('WAYLAND_DISPLAY')
+                    and pystray.Icon.__module__ == 'pystray._xorg'):
+                raise RuntimeError(
+                    "Wayland tray needs the GTK/AppIndicator backend. "
+                    "Install python3-gi and an AppIndicator typelib, create "
+                    "the virtual environment with --system-site-packages, "
+                    "then restart Macast. For a headless session use the CLI.")
             self.app = pystray.Icon(self.name,
                                     Image.open(self.icon),
                                     title=self.name,
@@ -276,11 +301,8 @@ class App:
             except Exception as e:
                 self.notification("Error", "Cannot access System Events")
                 logger.error(e)
-                callback()
         else:
             self.notification("Macast", content)
-            if callback:
-                callback()
 
     def get_env(self):
         # https://github.com/pyinstaller/pyinstaller/issues/3668#issuecomment-742547785

@@ -289,6 +289,8 @@ class Macast(App):
         elif sys.platform == 'win32' and "python" not in os.path.basename(sys.executable).lower():
             platform_options = [self.start_at_login_menuitem]
             Setting.set_start_at_login(self.setting_start_at_login)
+        elif sys.platform == 'linux':
+            platform_options = [self.start_at_login_menuitem]
         if sys.platform == 'darwin':
             self.menubar_icon_menuitem = MenuItem(_("Menubar Icon"),
                                                   children=App.build_menu_item_group([
@@ -344,8 +346,8 @@ class Macast(App):
         self.service.run_async()
 
     def check_update(self, verbose=True):
-        release_url = 'https://github.com/ccjjxx99/Macast-RTX-Edition/releases/latest'
-        api_url = 'https://api.github.com/repos/ccjjxx99/Macast-RTX-Edition/releases/latest'
+        release_url = 'https://github.com/lemonevo/Macast-RTX-Edition/releases/latest'
+        api_url = 'https://api.github.com/repos/lemonevo/Macast-RTX-Edition/releases/latest'
         try:
             response = requests.get(
                 api_url,
@@ -363,9 +365,12 @@ class Macast(App):
             logger.info("tag_name: {}".format(res['tag_name']))
 
             if current_version < online_version:
-                self.dialog(_("Macast New Update {}").format(res['tag_name']),
-                            lambda: self.open_browser(release_url),
-                            ok="Update")
+                if verbose and self.platform != Platform.Darwin:
+                    self.open_browser(release_url)
+                else:
+                    self.dialog(_("Macast New Update {}").format(res['tag_name']),
+                                lambda: self.open_browser(release_url),
+                                ok="Update")
             else:
                 if verbose:
                     self.notification("Macast", _("You're up to date."))
@@ -540,3 +545,51 @@ def cli(renderer=None, protocol=None):
     if protocol is None:
         protocol = DLNAProtocol()
     Service(renderer, protocol).run()
+
+
+def _load_language():
+    """Load the bundled gettext catalog for source and installed runs."""
+    locale = Setting.get_locale()
+    package_dir = os.path.dirname(__file__)
+    roots = [
+        os.path.join(sys._MEIPASS, 'i18n')
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS') else '',
+        os.path.join(package_dir, 'i18n'),
+        os.path.join(os.path.dirname(package_dir), 'i18n'),
+    ]
+    for root in roots:
+        if root and os.path.isdir(root):
+            try:
+                lang = gettext.translation('macast', localedir=root,
+                                           languages=[locale])
+                lang.install()
+                return lang.gettext
+            except FileNotFoundError:
+                continue
+    return gettext.gettext
+
+
+def _set_mpv_default_path():
+    """Use a bundled mpv when present, otherwise the user's PATH."""
+    root = (sys._MEIPASS if getattr(sys, 'frozen', False)
+            and hasattr(sys, '_MEIPASS')
+            else os.path.dirname(os.path.dirname(__file__)))
+    binary = ('bin/mpv.exe' if sys.platform == 'win32'
+              else 'bin/MacOS/mpv' if sys.platform == 'darwin'
+              else 'bin/mpv')
+    bundled = os.path.join(root, binary)
+    Setting.mpv_default_path = bundled if os.path.isfile(bundled) else 'mpv'
+
+
+def gui_entry():
+    """Console entry point that initializes localization and mpv."""
+    lang = _load_language()
+    _set_mpv_default_path()
+    gui(lang=lang)
+
+
+def cli_entry():
+    """CLI entry point that initializes localization and mpv."""
+    _load_language()
+    _set_mpv_default_path()
+    cli()

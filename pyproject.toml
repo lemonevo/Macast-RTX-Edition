@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools==83.0.0"]
+requires = ["setuptools==83.0.0", "Babel==2.18.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,6 +8,26 @@ dynamic = ["version", "readme", "dependencies"]
 requires-python = ">=3.10"
 license = "GPL-3.0-or-later"
 description = "A lightweight DLNA Media Renderer with NVIDIA RTX Video support"
+authors = [{ name = "Macast contributors and ccjjxx99" }]
+keywords = ["mpv", "dlna", "renderer", "nvidia", "rtx", "vsr", "hdr"]
+classifiers = [
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Video",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+Homepage = "https://github.com/lemonevo/Macast-RTX-Edition"
+
+[project.scripts]
+macast-rtx-cli = "macast.macast:cli_entry"
+macast-rtx-gui = "macast.macast:gui_entry"
 
 [tool.setuptools]
 include-package-data = true

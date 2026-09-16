@@ -1,11 +1,12 @@
 include *.md
+include Macast.py hook-pystray.py setup_py2app.py
+recursive-include docs *.md
+recursive-include requirements *.txt
+recursive-include scripts *.py *.ps1 *.sh
+recursive-include i18n *.po
 recursive-include macast .version
 recursive-include macast/xml *.xml
-include macast/xml/settings_rtx.html
+recursive-include macast/xml *.html
 recursive-include macast/xml *.csv
 recursive-include macast/scripts *.lua
-recursive-include macast/assets *.png
-recursive-include macast/assets *.icns
-recursive-include macast/assets *.ico
-include macast/assets/settings.js
-include macast/assets/settings.css
+recursive-include macast/assets *.png *.icns *.ico *.js *.css *.ttf *.woff

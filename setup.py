@@ -1,14 +1,31 @@
-"""Compatibility setup.py for editable/source installs."""
+"""Setuptools build hooks and runtime dependencies for source installs."""
 
-import sys
-from setuptools import setup, find_packages
+from pathlib import Path
 
-VERSION = "0.0.0"
-with open("macast/.version", "r", encoding="utf-8") as f:
-    VERSION = f.read().strip()
-with open("README.md", "r", encoding="utf-8") as f:
-    LONG_DESCRIPTION = f.read()
-OPTIONS = {}
+from setuptools import find_packages, setup
+from setuptools.command.build_py import build_py
+
+
+class BuildWithTranslations(build_py):
+    """Include compiled gettext catalogs in installed wheels."""
+
+    def run(self):
+        super().run()
+        from babel.messages.mofile import write_mo
+        from babel.messages.pofile import read_po
+
+        source_root = Path(__file__).resolve().parent / "i18n"
+        target_root = Path(self.build_lib) / "macast" / "i18n"
+        for po_path in sorted(source_root.glob("*/LC_MESSAGES/macast.po")):
+            locale_name = po_path.parents[1].name
+            target = target_root / locale_name / "LC_MESSAGES" / "macast.mo"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with po_path.open("r", encoding="utf-8") as source_file:
+                catalog = read_po(source_file, locale=locale_name)
+            with target.open("wb") as output_file:
+                write_mo(output_file, catalog)
+
+
 INSTALL = [
     "CherryPy==18.10.0",
     "lxml==6.1.1",
@@ -16,56 +33,16 @@ INSTALL = [
     "packaging==26.2",
     "platformdirs==4.11.0",
     "requests==2.34.2",
+    "pyperclip==1.11.0",
+    'rumps>=0.4.0; sys_platform == "darwin"',
+    'Pillow==12.3.0; sys_platform != "darwin"',
+    'pystray==0.19.5; sys_platform != "darwin"',
 ]
-PACKAGES = find_packages()
-
-if sys.platform == "darwin":
-    INSTALL += ["rumps>=0.4.0", "pyperclip==1.11.0"]
-elif sys.platform == "win32":
-    INSTALL += [
-        "Pillow==12.3.0",
-        "pyperclip==1.11.0",
-        "pystray==0.19.5",
-    ]
-else:
-    INSTALL += [
-        "Pillow==12.3.0",
-        "pyperclip==1.11.0",
-        "pystray==0.19.5",
-    ]
 
 setup(
-    name="macast-rtx-edition",
-    version=VERSION,
-    author="Macast contributors and ccjjxx99",
-    description="A lightweight DLNA Media Renderer with NVIDIA RTX Video support",
-    license="GPL-3.0-or-later",
-    url="https://github.com/ccjjxx99/Macast-RTX-Edition",
-    long_description=LONG_DESCRIPTION,
-    long_description_content_type="text/markdown",
-    classifiers=[
-        "Topic :: Multimedia :: Sound/Audio",
-        "Topic :: Multimedia :: Video",
-        "Programming Language :: Python :: 3",
-        "Programming Language :: Python :: 3.10",
-        "Programming Language :: Python :: 3.11",
-        "Programming Language :: Python :: 3.12",
-        "Operating System :: MacOS :: MacOS X",
-        "Operating System :: Microsoft :: Windows :: Windows 10",
-        "Operating System :: POSIX",
-        "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
-    ],
-    platforms=["MacOS X", "Windows", "POSIX"],
-    keywords=["mpv", "dlna", "renderer", "nvidia", "rtx", "vsr", "hdr"],
-    options=OPTIONS,
     install_requires=INSTALL,
-    packages=PACKAGES,
+    packages=find_packages(),
     include_package_data=True,
-    entry_points={
-        "console_scripts": [
-            "macast-rtx-cli = macast.macast:cli",
-            "macast-rtx-gui = macast.macast:gui",
-        ]
-    },
-    python_requires=">=3.10",
+    package_data={"macast": ["i18n/*/LC_MESSAGES/*.mo"]},
+    cmdclass={"build_py": BuildWithTranslations},
 )

@@ -12,7 +12,6 @@
 #
 
 import sys
-import random
 import socket
 import logging
 import threading
@@ -59,9 +58,8 @@ class SSDPServer:
     """A class implementing a SSDP server.  The notify_received and
     searchReceived methods are called when the appropriate type of
     datagram is received by the server."""
-    known = {}
-
     def __init__(self):
+        self.known = {}
         self.ip_list = []
         self.sock_list = []
         self.sock = None
@@ -87,7 +85,8 @@ class SSDPServer:
             self.running = False
             # Wake up the socket, this will speed up exiting ssdp thread.
             try:
-                socket.socket(socket.AF_INET, socket.SOCK_DGRAM).sendto(b'', (SSDP_ADDR, SSDP_PORT))
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as wake_socket:
+                    wake_socket.sendto(b'', (SSDP_ADDR, SSDP_PORT))
             except Exception as e:
                 pass
             self.sending_byebye = byebye
@@ -106,13 +105,6 @@ class SSDPServer:
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         elif sys.platform == 'darwin':
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-        elif hasattr(socket, "SO_REUSEPORT"):
-            try:
-                self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-                logger.debug("SSDP set SO_REUSEPORT")
-            except socket.error as e:
-                logger.error("SSDP cannot set SO_REUSEPORT")
-                logger.error(str(e))
         elif hasattr(socket, "SO_REUSEADDR"):
             try:
                 self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -120,6 +112,12 @@ class SSDPServer:
             except socket.error as e:
                 logger.error("SSDP cannot set SO_REUSEADDR")
                 logger.error(str(e))
+            if hasattr(socket, "SO_REUSEPORT"):
+                try:
+                    self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+                    logger.debug("SSDP set SO_REUSEPORT")
+                except socket.error as e:
+                    logger.debug("SSDP cannot set SO_REUSEPORT: %s", e)
 
         # self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 10)
 
@@ -142,6 +140,7 @@ class SSDPServer:
             logger.error(e)
             cherrypy.engine.publish("app_notify", "Macast", "SSDP Can't start")
             threading.Thread(target=lambda: Setting.stop_service(), name="SSDP_STOP_THREAD").start()
+            self.close_sockets()
             return
         self.sock.settimeout(1)
 
@@ -151,6 +150,8 @@ class SSDPServer:
                 self.datagram_received(data, addr)
             except socket.timeout:
                 continue
+            except (UnicodeError, ValueError, IndexError, KeyError) as err:
+                logger.warning('Ignoring invalid SSDP datagram: %s', err)
         self.shutdown()
         for ip, mask in self.ip_list:
             logger.error("drop membership {}".format(ip))
@@ -159,8 +160,15 @@ class SSDPServer:
                 self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_DROP_MEMBERSHIP, mreq)
             except Exception:
                 continue
-        self.sock.close()
-        self.sock = None
+        self.close_sockets()
+
+    def close_sockets(self):
+        for sock in self.sock_list:
+            sock.close()
+        self.sock_list = []
+        if self.sock is not None:
+            self.sock.close()
+            self.sock = None
 
     def shutdown(self):
         for st in self.known:
@@ -176,18 +184,22 @@ class SSDPServer:
 
         try:
             header = data.decode().split('\r\n\r\n')[0]
-        except ValueError as err:
+        except UnicodeError as err:
             logger.error(err)
             return
         if len(header) == 0:
             return
 
         lines = header.split('\r\n')
-        cmd = lines[0].split(' ')
+        cmd = lines[0].split()
+        if len(cmd) < 2:
+            return
         lines = map(lambda x: x.replace(': ', ':', 1), lines[1:])
         lines = filter(lambda x: len(x) > 0, lines)
 
         headers = [x.split(':', 1) for x in lines]
+        if any(len(item) != 2 for item in headers):
+            return
         headers = dict(map(lambda x: (x[0].lower(), x[1]), headers))
 
         if cmd[0] != 'NOTIFY':
@@ -242,11 +254,19 @@ class SSDPServer:
 
         (host, port) = host_port
 
-        logger.info('Discovery request from (%s,%d) for %s' % (host, port,
-                                                               headers['st']))
+        st = headers.get('st')
+        if not st:
+            return
+        try:
+            mx = int(headers.get('mx', '1'))
+        except ValueError:
+            return
+        if not 0 <= mx <= 120:
+            return
+        logger.info('Discovery request from (%s,%d) for %s', host, port, st)
         # Do we know about this service?
         for i in self.known.values():
-            if i['ST'] == headers['st'] or headers['st'] == 'ssdp:all':
+            if i['ST'] == st or st == 'ssdp:all':
                 response = ['HTTP/1.1 200 OK']
 
                 usn = None
@@ -261,11 +281,7 @@ class SSDPServer:
                                                             usegmt=True))
 
                     response.extend(('', ''))
-                    delay = random.randint(0, int(headers['mx']))
                     destination = (host, port)
-                    logger.debug('send discovery response delayed by %ds for %s to %r' % (delay, usn, destination))
-                    # logger.debug(response)
-                    # asyncio.sleep(delay)
                     for ip, mask in self.ip_list:
                         if self.get_subnet_ip(ip, mask) == self.get_subnet_ip(host, mask):
                             self.sock.sendto('\r\n'.join(response).format(ip).encode(), destination)

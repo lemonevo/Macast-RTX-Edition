@@ -12,13 +12,13 @@ import logging
 import cherrypy
 import threading
 from urllib.parse import urlsplit
+from xml.sax.saxutils import escape
 
 from lxml import etree
 from queue import Queue
 from enum import Enum
-from cherrypy import _cpnative_server
 
-from .utils import load_xml, XMLPath, Setting, cherrypy_publish, SETTING_DIR
+from .utils import load_xml, XMLPath, Setting, cherrypy_publish, SETTING_DIR, validate_settings
 
 logger = logging.getLogger("Protocol")
 logger.setLevel(logging.INFO)
@@ -621,12 +621,15 @@ class DLNAProtocol(Protocol):
         :param rawbody: soap request from dlna client
         :return:
         """
-        root = parse_untrusted_xml(rawbody)[0][0]
+        try:
+            root = parse_untrusted_xml(rawbody)[0][0]
+            action = root.tag.split('}')[1]
+            service = root.tag.split(":")[3]
+        except (etree.XMLSyntaxError, IndexError, AttributeError, TypeError):
+            raise cherrypy.HTTPError(400, 'Invalid SOAP envelope')
         param = {}
         for node in root:
             param[node.tag] = node.text
-        action = root.tag.split('}')[1]
-        service = root.tag.split(":")[3]
         method = "{}_{}".format(service, action)
         if method not in [
             'AVTransport_GetPositionInfo',
@@ -930,7 +933,7 @@ class Handler:
         return protocols.pop()
 
     def reload(self):
-        cherrypy.server.httpserver = _cpnative_server.CPHTTPServer(cherrypy.server)
+        pass
 
     @staticmethod
     def require_loopback():
@@ -1012,11 +1015,10 @@ class Handler:
                 raise cherrypy.HTTPError(413, 'Settings payload is too large')
             try:
                 setting = json.loads(setting)
-                if not isinstance(setting, dict):
-                    raise ValueError('settings must be a JSON object')
-            except (TypeError, ValueError, json.JSONDecodeError):
+                validate_settings(setting)
+            except (TypeError, ValueError) as error:
                 res['code'] = 1
-                res['message'] = 'json format error'
+                res['message'] = str(error)
             else:
                 Setting.setting = setting
                 Setting.save()
@@ -1053,12 +1055,12 @@ class DLNAHandler(Handler):
 
     def build_description(self):
         self.description = load_xml(XMLPath.DESCRIPTION.value).format(
-            friendly_name=Setting.get_friendly_name(),
+            friendly_name=escape(str(Setting.get_friendly_name())),
             manufacturer="Macast contributors",
             manufacturer_url="https://github.com/ccjjxx99/Macast-RTX-Edition",
             model_description="DLNA renderer with NVIDIA RTX Video support",
             model_name="Macast RTX Edition",
-            model_url="https://github.com/ccjjxx99/Macast-RTX-Edition",
+            model_url="https://github.com/lemonevo/Macast-RTX-Edition",
             model_number=Setting.get_version(),
             uuid=Setting.get_usn(),
             serial_num=1024,
@@ -1095,7 +1097,11 @@ class DLNAHandler(Handler):
             CALLBACK = cherrypy.request.headers.get('CALLBACK')
             TIMEOUT = cherrypy.request.headers.get('TIMEOUT')
             TIMEOUT = TIMEOUT if TIMEOUT is not None else 'Second-1800'
-            TIMEOUT = int(TIMEOUT.split('-')[-1])
+            if not re.fullmatch(r'Second-[0-9]+', TIMEOUT):
+                raise cherrypy.HTTPError(412, 'Invalid subscription timeout')
+            TIMEOUT = int(TIMEOUT.split('-', 1)[1])
+            if not 1 <= TIMEOUT <= 86400:
+                raise cherrypy.HTTPError(412, 'Invalid subscription timeout')
             if SID:
                 logger.error("RENEW SUBSCRIBE:!!!!!!!" + service)
                 res = self.protocol.renew_subscribe(SID, TIMEOUT)

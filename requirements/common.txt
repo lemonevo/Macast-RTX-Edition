@@ -9,3 +9,6 @@ requests==2.34.2
 Pillow==12.3.0; platform_system != "Darwin"
 pyperclip==1.11.0
 pystray==0.19.5; platform_system != "Darwin"
+
+# Linux tray backends are selected by pystray at runtime. GTK is optional;
+# install the distro package python3-gi when GTK tray integration is needed.

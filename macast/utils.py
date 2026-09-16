@@ -27,6 +27,46 @@ PROTOCOL_DIR = 'protocol'
 RENDERER_DIR = 'renderer'
 
 
+def validate_settings(settings):
+    """Validate built-in settings before replacing the complete settings file.
+
+    Unknown keys belong to plugins and are left untouched.
+    """
+    if not isinstance(settings, dict) or any(not isinstance(key, str) for key in settings):
+        raise ValueError('Settings must be a JSON object with string keys')
+
+    ranges = {
+        'ApplicationPort': (0, 65535),
+        'PlayerSize': (0, 4),
+        'PlayerPosition': (0, 4),
+        'PlayerHW': (0, 2),
+        'PlayerOntop': (0, 1),
+        'PlayerDefaultVolume': (0, 100),
+        'RTXVideoVSR': (0, 1),
+        'RTXVideoHDR': (0, 1),
+        'StartAtLogin': (0, 1),
+        'CheckUpdate': (0, 1),
+        'MenubarIcon': (0, 1),
+    }
+    for key, (minimum, maximum) in ranges.items():
+        if key in settings and (type(settings[key]) is not int or
+                                not minimum <= settings[key] <= maximum):
+            raise ValueError('Invalid ' + key)
+
+    for key in ('Additional_Interfaces', 'Blocked_Interfaces'):
+        if key in settings and (not isinstance(settings[key], list) or
+                                any(not isinstance(item, str) for item in settings[key])):
+            raise ValueError('Invalid ' + key)
+
+    for key in ('USN', 'DLNA_FriendlyName', 'Macast_Renderer', 'Macast_Protocol'):
+        if key in settings and (not isinstance(settings[key], str) or not settings[key]):
+            raise ValueError('Invalid ' + key)
+
+    if 'RTXVideoCapabilityState' in settings and settings['RTXVideoCapabilityState'] not in (
+            'supported', 'unsupported', 'unknown'):
+        raise ValueError('Invalid RTXVideoCapabilityState')
+
+
 class SettingProperty(Enum):
     USN = 0
     CheckUpdate = 1
@@ -42,6 +82,7 @@ class SettingProperty(Enum):
 
 class Setting:
     setting = {}
+    loaded = False
     version = None
     setting_path = os.path.join(SETTING_DIR, "macast_setting.json")
     last_ip = None
@@ -70,7 +111,7 @@ class Setting:
                     Setting.version = f.read().strip()
             except FileNotFoundError as e:
                 Setting.version = "0.0"
-        if bool(Setting.setting) is False:
+        if not Setting.loaded:
             if not os.path.exists(Setting.setting_path):
                 Setting.setting = {}
             else:
@@ -80,11 +121,13 @@ class Setting:
                     logger.error(Setting.setting)
                 except Exception as e:
                     logger.error(e)
+            Setting.loaded = True
         return Setting.setting
 
     @staticmethod
     def reload():
-        Setting.setting = None
+        Setting.setting = {}
+        Setting.loaded = False
         Setting.load()
 
     @staticmethod
@@ -144,12 +187,25 @@ class Setting:
         last_ip = []
         gateways = ni.gateways()  # {type: [{ip, interface, default},{},...], type: []}
         interfaces = set(Setting.get(SettingProperty.Additional_Interfaces, []))
-        interface_type = [ni.AF_INET, ni.AF_LINK]
-        for t in interface_type:
-            if t in gateways:
-                for i in gateways[t]:
-                    if len(i) > 1:
-                        interfaces.add(i[1])
+        if sys.platform == 'linux':
+            # Linux hosts commonly have Docker, VPN and tunnel interfaces.
+            # Prefer the IPv4 default route. netifaces may omit it when an
+            # IPv6 default route is present, so fall back to IPv4 gateway
+            # interfaces rather than silently advertising on no interface.
+            default_route = gateways.get('default', {}).get(ni.AF_INET)
+            if default_route and len(default_route) > 1:
+                interfaces.add(default_route[1])
+            else:
+                for route in gateways.get(ni.AF_INET, []):
+                    if len(route) > 1:
+                        interfaces.add(route[1])
+        else:
+            interface_type = [ni.AF_INET, ni.AF_LINK]
+            for t in interface_type:
+                if t in gateways:
+                    for i in gateways[t]:
+                        if len(i) > 1:
+                            interfaces.add(i[1])
         for i in Setting.get(SettingProperty.Blocked_Interfaces, []):
             if i in interfaces:
                 interfaces.remove(i)
@@ -190,7 +246,7 @@ class Setting:
         else:
             lang = os.environ.get('LANGUAGE')
             if lang is None:
-                lang = os.environ['LANG']
+                lang = os.environ.get('LANG', 'en_US')
             if lang is None:
                 return 'en_US'
             lang = lang.split(':')[0].split('.')[0]
@@ -200,7 +256,7 @@ class Setting:
     def get(property, default=1):
         """Get application settings
         """
-        if not bool(Setting.setting):
+        if not Setting.loaded:
             Setting.load()
         if property.name in Setting.setting:
             return Setting.setting[property.name]
@@ -211,6 +267,8 @@ class Setting:
     def set(property, data):
         """Set application settings
         """
+        if not Setting.loaded:
+            Setting.load()
         Setting.setting[property.name] = data
         Setting.save()
 
@@ -286,6 +344,44 @@ class Setting:
                 logger.error("Cannot update startup registration: %s", exc)
                 return 1, str(exc)
             return 0, "success"
+        elif sys.platform == 'linux':
+            # Follow the freedesktop XDG autostart convention. This works for
+            # GNOME, KDE, XFCE and other desktop environments without a
+            # desktop-specific dependency.
+            config_home = os.environ.get(
+                'XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
+            desktop_dir = os.path.join(config_home, 'autostart')
+            desktop_file = os.path.join(desktop_dir, 'macast-rtx-edition.desktop')
+            if not launch:
+                try:
+                    os.remove(desktop_file)
+                except FileNotFoundError:
+                    pass
+                return (0, 'success')
+            try:
+                os.makedirs(desktop_dir, exist_ok=True)
+                if getattr(sys, 'frozen', False):
+                    argv = [sys.executable]
+                else:
+                    script = os.path.abspath(sys.argv[0])
+                    if not os.path.isfile(script):
+                        return (1, 'Cannot determine application path.')
+                    argv = ([sys.executable, script]
+                            if script.endswith('.py') else [script])
+                # Desktop Entry Exec uses double quotes, not shell quoting.
+                command = ' '.join('"{}"'.format(arg.replace('\\', '\\\\')
+                                                   .replace('"', '\\"')
+                                                   .replace('$', '\\$')
+                                                   .replace('`', '\\`'))
+                                   for arg in argv)
+                with open(desktop_file, 'w', encoding='utf-8') as f:
+                    f.write('[Desktop Entry]\nType=Application\nName=Macast RTX Edition\n'
+                            'Comment=DLNA Media Renderer\nExec={}\n'
+                            'Terminal=false\nCategories=AudioVideo;Player;\n'.format(command))
+                return (0, 'success')
+            except OSError as exc:
+                logger.error('Cannot update XDG autostart: %s', exc)
+                return (1, str(exc))
         else:
             return (1, 'Not support current platform.')
 
@@ -337,9 +433,10 @@ class Setting:
                                      cherrypy.engine.states.EXITING,
                                      ]:
             return
-        while cherrypy.engine.state != cherrypy.engine.states.STARTED:
+        while cherrypy.engine.state == cherrypy.engine.states.STARTING:
             time.sleep(0.5)
-        cherrypy.engine.exit()
+        if cherrypy.engine.state == cherrypy.engine.states.STARTED:
+            cherrypy.engine.exit()
 
     @staticmethod
     def is_service_running():
