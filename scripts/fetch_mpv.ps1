@@ -11,13 +11,27 @@ if (-not $ArtifactRoot) {
     $ArtifactRoot = Join-Path $RepositoryRoot ".artifacts"
 }
 
-$MpvVersion = "0.41.0-dev-g63ada87ec"
-$MpvBuildId = "30636475556"
-$MpvCommit = "63ada87ec"
-$ArchiveName = "mpv-v$MpvVersion-$MpvBuildId-x86_64-pc-windows-msvc.zip"
-$ExpectedSha256 = "B195E12366FC95EABF22A0D409C160069BB222371C7F4570C2CEF7B217EE80F7"
-$DownloadUrl = "https://github.com/mpv-player/mpv/releases/download/git-release/$ArchiveName"
-$VersionRoot = Join-Path $ArtifactRoot "mpv-v$MpvVersion-$MpvBuildId"
+# Upstream rebuilds the "git-release" tag continuously and deletes the previous
+# nightly archives, so a pinned asset name breaks the moment mpv publishes a new
+# build (the old file simply 404s). Resolve whichever x86_64 build the tag
+# currently carries, and verify it against the digest GitHub publishes.
+$ReleaseApiUrl = "https://api.github.com/repos/mpv-player/mpv/releases/tags/git-release"
+$ReleaseHeaders = @{ "User-Agent" = "Macast-RTX-Edition-build" }
+if ($env:GH_TOKEN) {
+    $ReleaseHeaders["Authorization"] = "Bearer $($env:GH_TOKEN)"
+}
+
+$Release = Invoke-RestMethod -Uri $ReleaseApiUrl -Headers $ReleaseHeaders -UseBasicParsing
+$Asset = $Release.assets |
+    Where-Object { $_.name -like "*-x86_64-pc-windows-msvc.zip" } |
+    Select-Object -First 1
+if (-not $Asset) {
+    throw "No x86_64-pc-windows-msvc archive is attached to the mpv git-release tag."
+}
+
+$ArchiveName = $Asset.name
+$MpvVersion = [System.IO.Path]::GetFileNameWithoutExtension($ArchiveName) -replace "^mpv-", ""
+$VersionRoot = Join-Path $ArtifactRoot $MpvVersion
 $ArchivePath = Join-Path $VersionRoot $ArchiveName
 $ExtractRoot = Join-Path $VersionRoot "extracted"
 $MpvPath = Join-Path $ExtractRoot "mpv.exe"
@@ -26,13 +40,20 @@ $VulkanPath = Join-Path $ExtractRoot "vulkan-1.dll"
 New-Item -ItemType Directory -Path $VersionRoot -Force | Out-Null
 
 if (-not (Test-Path -LiteralPath $ArchivePath)) {
-    Write-Host "Downloading official mpv git-release $MpvVersion..."
-    Invoke-WebRequest -UseBasicParsing -Uri $DownloadUrl -OutFile $ArchivePath
+    Write-Host "Downloading $ArchiveName ..."
+    Invoke-WebRequest -UseBasicParsing -Uri $Asset.browser_download_url -OutFile $ArchivePath
 }
 
 $ActualSha256 = (Get-FileHash -LiteralPath $ArchivePath -Algorithm SHA256).Hash
-if ($ActualSha256 -ne $ExpectedSha256) {
-    throw "mpv archive checksum mismatch. Preserve the file for inspection: $ArchivePath"
+
+# Read the digest through PSObject so StrictMode does not trip if an older API
+# response omits the field.
+$DigestProperty = $Asset.PSObject.Properties | Where-Object { $_.Name -eq "digest" }
+if ($DigestProperty -and $DigestProperty.Value) {
+    $ExpectedSha256 = $DigestProperty.Value -replace "^sha256:", ""
+    if ($ActualSha256 -ne $ExpectedSha256.ToUpperInvariant()) {
+        throw "mpv archive checksum mismatch. Preserve the file for inspection: $ArchivePath"
+    }
 }
 
 if (-not (Test-Path -LiteralPath $ExtractRoot)) {
@@ -56,13 +77,12 @@ foreach ($RequiredFile in @($MpvPath, $VulkanPath)) {
 }
 
 $VersionLine = (& $MpvPath --version | Select-Object -First 1)
-if ($VersionLine -notmatch [regex]::Escape("g$MpvCommit")) {
+if ($VersionLine -notmatch "^mpv ") {
     throw "Unexpected mpv binary version: $VersionLine"
 }
 
 [pscustomobject]@{
     Version = $MpvVersion
-    Commit = $MpvCommit
     Archive = $ArchivePath
     ArchiveSha256 = $ActualSha256
     Mpv = $MpvPath

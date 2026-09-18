@@ -19,6 +19,8 @@ jobs:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # xvfb provides the X display that the tray backends need to import at
+      # all; the runner is headless.
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -28,7 +30,8 @@ jobs:
             gir1.2-gtk-3.0 \
             gir1.2-ayatanaappindicator3-0.1 \
             mpv \
-            xclip
+            xclip \
+            xvfb
 
       # scripts/build_linux.sh needs the interpreter to see the distro
       # python3-gi bindings, so the venv must inherit the system site packages
@@ -42,7 +45,10 @@ jobs:
       - name: Build Linux executable
         env:
           PYTHON: .venv-build/bin/python
-        run: ./scripts/build_linux.sh
+          # Pin the tray backend so the build does not fall back to the Xlib
+          # backend, which would be bundled into the artifact.
+          PYSTRAY_BACKEND: appindicator
+        run: xvfb-run --auto-servernum ./scripts/build_linux.sh
 
       - name: Rename checksum file for this platform
         run: |
@@ -57,6 +63,7 @@ jobs:
             .build/*/dist/Macast-RTX-Edition-v*
             .build/*/dist/SHA256SUMS-linux.txt
           if-no-files-found: error
+          include-hidden-files: true
 
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/')

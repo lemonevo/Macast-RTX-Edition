@@ -34,6 +34,8 @@ jobs:
 
       - name: Build Windows executable
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: ./scripts/build_windows.ps1 -OutputRoot .build/ci
 
       - name: Name checksum file for this platform
@@ -51,6 +53,7 @@ jobs:
             .build/ci/dist/*.exe
             .build/ci/dist/SHA256SUMS-windows.txt
           if-no-files-found: error
+          include-hidden-files: true
 
       - name: Publish tagged release
         if: startsWith(github.ref, 'refs/tags/')
