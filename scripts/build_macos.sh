@@ -58,11 +58,17 @@ app_name="Macast-RTX-Edition"
     --add-data "$repo_root/macast/assets:macast/assets" \
     --add-data "$repo_root/macast/scripts:macast/scripts" \
     --add-data "$output_root/i18n:i18n" \
-    --add-data "$mpv_staging:bin/MacOS" \
     "$repo_root/Macast.py"
 
 app_path="$output_root/dist/$app_name.app"
 info_plist="$app_path/Contents/Info.plist"
+
+# PyInstaller analyses every Mach-O file it ships and collects that file's
+# dependencies too, so passing the staged mpv directory as --add-data made it
+# copy all the dylibs a second time into Contents/Frameworks. Copying the
+# directory in afterwards avoids that duplication.
+mkdir -p "$app_path/Contents/Frameworks/bin/MacOS"
+cp -R "$mpv_staging/." "$app_path/Contents/Frameworks/bin/MacOS/"
 
 # PyInstaller cannot set these from the command line. The menu bar app must set
 # LSUIElement so it does not occupy a Dock slot, and the bundle version must

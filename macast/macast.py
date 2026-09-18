@@ -359,7 +359,15 @@ class Macast(App):
             )
             response.raise_for_status()
             res = response.json()
-            online_version = Version(res['tag_name'].lstrip('v'))
+            # Release tags are picked by hand and are not required to be PEP 440
+            # versions (v1.1.1-self, for example), so an unparsable tag is a
+            # normal outcome rather than a failure of the whole check.
+            try:
+                online_version = Version(res['tag_name'].lstrip('v'))
+            except InvalidVersion:
+                logger.info("update check skipped: {} is not a PEP 440 version"
+                            .format(res['tag_name']))
+                return
             current_version = Version(Setting.get_version())
 
             logger.info("tag_name: {}".format(res['tag_name']))
