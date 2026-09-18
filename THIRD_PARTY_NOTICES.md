@@ -32,3 +32,16 @@ The Windows executable also contains Python and these directly declared packages
 | requests | 2.34.2 | Apache-2.0 | <https://requests.readthedocs.io/> |
 
 Transitive packages retain their own metadata and license files inside the Python distribution or build environment. `pip-audit` is run against the resolved dependency graph in CI; it is a security check, not a license-compatibility certification.
+
+## Third-party plugins
+
+The `plugins/` directory is the plugin source used by the settings page (see [plugins/README.md](plugins/README.md)). It mirrors the renderer/protocol plugins published by [xfangfang/Macast-plugins](https://github.com/xfangfang/Macast-plugins) and keeps locally patched copies where needed:
+
+| File | Author | Notes |
+| --- | --- | --- |
+| `plugins/nirvana.py` | xfangfang | Locally patched copy (v0.34) of the bilibili NVA protocol plugin, shown as **哔哩哔哩投屏（Bilibili 投屏）**. Fixes danmaku state sync, per-video danmaku files, danmaku parsing robustness, resolution-switch danmaku loss, DASH audio attachment, quality list fallback, quality downgrade reporting, and several crash paths. |
+| `plugins/iina.py`, `plugins/web.py`, `plugins/potplayer.py`, `plugins/live.py` | xfangfang, dushan555 (`live.py`) | Unmodified copies of the upstream plugins (only the download URLs differ). |
+| `plugins/pi_fm.py` | xfangfang | Unmodified upstream plugin for Raspberry Pi FM transmission. |
+
+Upstream notice: the plugin scripts are distributed by their authors for programming study only and marked as not for commercial use; the original copyright headers and source links are retained in each file. Confirm with the authors before redistributing or using them commercially.
+

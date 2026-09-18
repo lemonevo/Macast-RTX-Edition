@@ -142,6 +142,11 @@ class MPVRenderer(Renderer):
         # one second to restart MPV.
         self.command_lock = threading.Lock()
         self.renderer_setting = MPVRendererSetting()
+        # NVA PATCH: DASH 音轨 / 弹幕字幕要等文件加载完再挂（见 set_media_audio_file）
+        self.deferred_actions = {}
+        self.deferred_timer = None
+        self.deferred_lock = threading.Lock()
+        self.file_loaded = False
 
     def set_media_stop(self):
         self.send_command(['stop'])
@@ -173,8 +178,62 @@ class MPVRenderer(Renderer):
         player_size = get_player_setting(SettingProperty.PlayerSize)
         if player_size == SettingProperty.PlayerSize_FullScreen.value:
             options['fullscreen'] = 'yes'
+        # NVA PATCH: 新文件开始加载，等待它的 file-loaded 事件再挂音轨/弹幕
+        self.file_loaded = False
         self.send_command(['loadfile', url, 'replace', '-1',
                            ','.join([f'{i}={options[i]}' for i in options])])
+
+    def defer_on_file_loaded(self, kind, action):
+        """Run `action` once the current file is loaded.
+
+        mpv 在 loadfile 替换文件期间会拒绝 audio-add / sub-add（返回
+        "error running command"），所以音轨和弹幕都要等文件就绪；
+        文件已经就绪时立即执行，否则等 file-loaded 事件，并有一个兜底定时器。
+        """
+        run_now = False
+        with self.deferred_lock:
+            if self.file_loaded and self.running:
+                run_now = True
+            else:
+                self.deferred_actions[kind] = action
+                if self.deferred_timer is not None:
+                    self.deferred_timer.cancel()
+                timer = threading.Timer(2.0, self.apply_deferred_actions)
+                timer.daemon = True
+                self.deferred_timer = timer
+        if run_now:
+            action()
+            return
+        timer.start()
+
+    def apply_deferred_actions(self):
+        """挂载所有等待中的音轨/字幕（幂等）"""
+        with self.deferred_lock:
+            actions = list(self.deferred_actions.values())
+            self.deferred_actions = {}
+            timer = self.deferred_timer
+            self.deferred_timer = None
+        if timer is not None:
+            timer.cancel()
+        if not actions or not self.running:
+            return
+        for action in actions:
+            try:
+                action()
+            except Exception:
+                logger.exception('挂载音轨/字幕失败')
+
+    support_audio_file = True
+
+    def set_media_audio_file(self, url: str):
+        """ attach an external audio track (DASH streams deliver audio separately) """
+        if not url:
+            return
+        self.defer_on_file_loaded('audio', lambda: self.attach_audio_file(url))
+
+    def attach_audio_file(self, url: str):
+        logger.info('挂载外挂音轨: {}'.format(url))
+        self.send_command(['audio-add', url, 'select'])
 
     def set_media_title(self, data):
         """ data : string
@@ -188,6 +247,17 @@ class MPVRenderer(Renderer):
         self.send_command(['seek', data, 'absolute'])
 
     def set_media_sub_file(self, data):
+        """ 挂载弹幕/字幕文件
+
+        NVA PATCH: sub-add 同样会被正在切换文件的 mpv 拒绝，
+        所以延后到文件加载完成再挂（否则切换画质后弹幕会消失）。
+        """
+        if not data or not data.get('url'):
+            return
+        self.defer_on_file_loaded('subtitle', lambda: self.attach_sub_file(data))
+
+    def attach_sub_file(self, data):
+        logger.info('挂载字幕: {}'.format(data.get('url')))
         self.send_command(['sub-add', data['url'], 'select', data['title']])
 
     def set_media_sub_show(self, data: bool):
@@ -232,6 +302,11 @@ class MPVRenderer(Renderer):
         """Update player state from mpv
         """
         res = json.loads(res)
+        if res.get('event') == 'file-loaded':
+            # NVA PATCH: 文件加载完成后 mpv 才会接受 audio-add / sub-add
+            self.file_loaded = True
+            self.apply_deferred_actions()
+            return
         if 'id' in res:
             if res['id'] == ObserveProperty.volume.value:
                 logger.info(res)

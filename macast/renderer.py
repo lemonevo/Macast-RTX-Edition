@@ -91,6 +91,12 @@ class Renderer:
         """
         pass
 
+    #: Renderers that can attach an external audio track set this to True and
+    #: implement set_media_audio_file(url). Protocols that deliver DASH streams
+    #: (video and audio as two files) fall back to a merged stream when the
+    #: renderer cannot load the audio separately.
+    support_audio_file = False
+
     def set_media_title(self, data):
         """ data : string
         """

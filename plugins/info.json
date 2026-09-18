@@ -1,0 +1,71 @@
+{
+    "repo_url": "https://github.com/lemonevo/Macast-RTX-Edition/tree/main/plugins",
+    "plugin_v1": [
+        {
+            "author": "xfangfang",
+            "desc": "IINA support for Macast. Because IINA is developed based on MPV, this plugin's experience is similar to the built-in MPV renderer.",
+            "host_version": "0.7",
+            "platform": "darwin",
+            "renderer": "IINARenderer",
+            "title": "IINA Renderer",
+            "type": "renderer",
+            "url": "https://raw.githubusercontent.com/lemonevo/Macast-RTX-Edition/main/plugins/iina.py",
+            "version": "0.31"
+        },
+        {
+            "author": "xfangfang",
+            "desc": "PIFMRDS support for Macast. Only for Raspberry Pi, visit the plugin repository for more information.",
+            "host_version": "0.7",
+            "platform": "linux",
+            "renderer": "PIFMRenderer",
+            "title": "PIFMRDS Renderer",
+            "type": "renderer",
+            "url": "https://raw.githubusercontent.com/lemonevo/Macast-RTX-Edition/main/plugins/pi_fm.py",
+            "version": "0.2"
+        },
+        {
+            "author": "xfangfang",
+            "desc": "Using a web browser as DLNA media renderer. This plugin can be used to download media files or to play m3u8 links.",
+            "host_version": "0.7",
+            "platform": "darwin,linux,win32",
+            "renderer": "WebRenderer",
+            "title": "Web Renderer",
+            "type": "renderer",
+            "url": "https://raw.githubusercontent.com/lemonevo/Macast-RTX-Edition/main/plugins/web.py",
+            "version": "0.2"
+        },
+        {
+            "author": "xfangfang",
+            "desc": "PotPlayer support for Macast. This is a simple plugin that only supports play and stop.",
+            "host_version": "0.7",
+            "platform": "win32",
+            "renderer": "PotplayerRenderer",
+            "title": "PotPlayer Renderer",
+            "type": "renderer",
+            "url": "https://raw.githubusercontent.com/lemonevo/Macast-RTX-Edition/main/plugins/potplayer.py",
+            "version": "0.4"
+        },
+        {
+            "author": "xfangfang",
+            "desc": "哔哩哔哩投屏（Bilibili 投屏）：B 站客户端里显示为「我的小电视(有弹幕)」，支持弹幕、倍速、自动下集与 1080P 画质。本仓库维护版本，修复了弹幕开关状态不同步、弹幕文件互相覆盖、切换分辨率后弹幕消失、高画质无声等问题。",
+            "host_version": "0.7",
+            "platform": "darwin,win32,linux",
+            "protocol": "NVAProtocol",
+            "title": "哔哩哔哩投屏（Bilibili 投屏）",
+            "type": "protocol",
+            "url": "https://raw.githubusercontent.com/lemonevo/Macast-RTX-Edition/main/plugins/nirvana.py",
+            "version": "0.34"
+        },
+        {
+            "author": "dushan555",
+            "desc": "Live support for Macast. It is developed based on MPVRenderer and can be used to watch live TV.",
+            "host_version": "0.7",
+            "platform": "win32,darwin,linux",
+            "renderer": "LiveRenderer",
+            "title": "Live Renderer",
+            "type": "renderer",
+            "url": "https://raw.githubusercontent.com/lemonevo/Macast-RTX-Edition/main/plugins/live.py",
+            "version": "0.2"
+        }
+    ]
+}
