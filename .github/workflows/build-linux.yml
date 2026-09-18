@@ -1,0 +1,72 @@
+name: Build Linux
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            python3-gi \
+            python3-venv \
+            gir1.2-gtk-3.0 \
+            gir1.2-ayatanaappindicator3-0.1 \
+            mpv \
+            xclip
+
+      # scripts/build_linux.sh needs the interpreter to see the distro
+      # python3-gi bindings, so the venv must inherit the system site packages
+      # and be built on the distro interpreter rather than a toolcache one.
+      - name: Create build environment
+        run: |
+          /usr/bin/python3 -m venv --system-site-packages .venv-build
+          .venv-build/bin/python -m pip install --upgrade pip
+          .venv-build/bin/python -m pip install --requirement requirements/build-linux.txt
+
+      - name: Build Linux executable
+        env:
+          PYTHON: .venv-build/bin/python
+        run: ./scripts/build_linux.sh
+
+      - name: Rename checksum file for this platform
+        run: |
+          dist="$(ls -d .build/linux-*/dist)"
+          mv "$dist/SHA256SUMS.txt" "$dist/SHA256SUMS-linux.txt"
+
+      - name: Upload executable
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: Macast-RTX-Edition-Linux
+          path: |
+            .build/*/dist/Macast-RTX-Edition-v*
+            .build/*/dist/SHA256SUMS-linux.txt
+          if-no-files-found: error
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${{ github.ref_name }}"
+          gh release view "$tag" >/dev/null 2>&1 ||
+            gh release create "$tag" --generate-notes --title "Macast RTX Edition $tag"
+          gh release upload "$tag" \
+            .build/*/dist/Macast-RTX-Edition-v* \
+            .build/*/dist/SHA256SUMS-linux.txt \
+            --clobber

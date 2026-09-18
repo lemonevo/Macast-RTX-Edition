@@ -1,0 +1,3 @@
+-r darwin.txt
+Babel==2.18.0
+PyInstaller==6.22.3
