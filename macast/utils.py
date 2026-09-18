@@ -486,14 +486,67 @@ class Setting:
 
     @staticmethod
     def _restart_application():
-        """Replace the running process with a fresh one."""
+        """Start a fresh Macast process and quit this one.
+
+        这里不用 os.execv：macOS 的菜单栏图标（NSStatusItem）跟进程的生命周期
+        绑定，execv 只是替换进程映像、进程从未"退出"，系统不会回收旧图标，
+        重启后会留下一块空白的菜单栏占位。改成"启动新进程 + 旧进程退出"，
+        同时先停掉播放器，避免 mpv 子进程变成孤儿。
+        """
         logger.info('Restarting Macast to load new components')
+        # 1) 停掉播放器，否则旧的 mpv 子进程会留在后台
+        try:
+            for renderer in cherrypy.engine.publish('get_renderer'):
+                if renderer is not None:
+                    renderer.stop()
+        except Exception:
+            logger.exception('停止播放器失败，继续重启')
+        # 2) 停止服务，把端口让给新进程
+        try:
+            Setting.stop_service()
+        except Exception:
+            logger.exception('停止服务失败，继续重启')
+        # 3) 启动新进程
         executable, arguments = Setting.application_command()
         try:
-            os.execv(executable, arguments)
+            if sys.platform == 'darwin' and getattr(sys, 'frozen', False):
+                # 打包版交给系统重新打开 app（open -n），行为更规范
+                app_path = NSBundle.mainBundle().bundlePath()
+                process = subprocess.Popen(['open', '-n', app_path])
+                started = True
+            else:
+                # 新进程要脱离当前进程组、并且不要把输出打到父进程的终端：
+                # 否则父进程退出后新进程可能被一起结束，I/O 也会互相干扰
+                try:
+                    output = open(os.path.join(SETTING_DIR, 'macast-app.log'), 'a',
+                                  encoding='utf-8', errors='replace')
+                except OSError:
+                    output = subprocess.DEVNULL
+                popen_kwargs = {
+                    'cwd': os.getcwd(),
+                    'env': Setting.get_system_env(),
+                    'stdin': subprocess.DEVNULL,
+                    'stdout': output,
+                    'stderr': output,
+                }
+                if os.name != 'nt':
+                    popen_kwargs['start_new_session'] = True
+                process = subprocess.Popen(arguments, **popen_kwargs)
+                started = None
         except OSError:
-            logger.exception('Cannot restart Macast, restarting the service instead')
+            logger.exception('无法启动新的 Macast 进程，改为重启服务')
             cherrypy.engine.restart()
+            return
+        # 4) 确认新进程真的起来了，否则不要退出当前进程
+        if started is None:
+            time.sleep(1.5)
+            if process.poll() is not None:
+                logger.error('新的 Macast 进程启动失败（退出码 %s），继续使用当前进程',
+                             process.returncode)
+                cherrypy.engine.restart()
+                return
+        logger.info('New Macast process started, quitting this one')
+        os._exit(0)
 
 
 class XMLPath(Enum):

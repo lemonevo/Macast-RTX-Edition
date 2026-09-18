@@ -629,10 +629,19 @@ class MPVRenderer(Renderer):
             os.waitpid(-1, 1)
         except Exception as e:
             logger.error(e)
-        self.mpv_thread.join()
+        if self.mpv_thread is not None:
+            self.mpv_thread.join()
         # stop mpv ipc
         self.ipc_running = False
-        self.ipc_thread.join()
+        if self.ipc_thread is not None:
+            self.ipc_thread.join()
+        # NVA PATCH: 清理 IPC socket 文件，避免重启多次后 /tmp 里堆积
+        if os.name != 'nt':
+            try:
+                if os.path.exists(self.mpv_sock):
+                    os.remove(self.mpv_sock)
+            except OSError as error:
+                logger.warning(f'Cannot remove {self.mpv_sock}: {error}')
 
     def reload(self):
         """Reload MPV

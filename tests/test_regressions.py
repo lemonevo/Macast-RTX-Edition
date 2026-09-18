@@ -366,18 +366,71 @@ class RestartTests(unittest.TestCase):
         else:
             self.assertEqual(arguments[1:], sys.argv)
 
-    def test_restart_replaces_the_process(self):
-        with patch('macast.utils.os.execv') as execv:
+    def test_restart_starts_a_new_process_before_quitting(self):
+        # 不能再用 os.execv：那样 macOS 的菜单栏图标会残留成空白
+        renderer = Mock()
+        process = Mock()
+        process.poll.return_value = None
+        with patch('macast.utils.cherrypy.engine.publish', return_value=[renderer]) as publish, \
+                patch('macast.utils.Setting.stop_service') as stop_service, \
+                patch('macast.utils.subprocess.Popen', return_value=process) as popen, \
+                patch('macast.utils.time.sleep'), \
+                patch('macast.utils.os._exit') as exit_process:
             Setting._restart_application()
-        executable, arguments = execv.call_args.args
-        self.assertEqual(executable, sys.executable)
+        publish.assert_called_once_with('get_renderer')
+        renderer.stop.assert_called_once_with()
+        stop_service.assert_called_once_with()
+        arguments = popen.call_args.args[0]
         self.assertEqual(arguments[0], sys.executable)
+        self.assertEqual(process.poll.call_count, 1)
+        exit_process.assert_called_once_with(0)
 
-    def test_restart_falls_back_to_a_service_restart(self):
-        with patch('macast.utils.os.execv', side_effect=OSError('cannot exec')), \
-                patch('macast.utils.cherrypy.engine.restart') as restart:
+    def test_restart_keeps_running_when_the_new_process_dies(self):
+        process = Mock()
+        process.poll.return_value = 1
+        with patch('macast.utils.cherrypy.engine.publish', return_value=[]), \
+                patch('macast.utils.Setting.stop_service'), \
+                patch('macast.utils.subprocess.Popen', return_value=process), \
+                patch('macast.utils.time.sleep'), \
+                patch('macast.utils.cherrypy.engine.restart') as restart, \
+                patch('macast.utils.os._exit') as exit_process:
             Setting._restart_application()
         restart.assert_called_once_with()
+        exit_process.assert_not_called()
+
+    def test_restart_falls_back_when_the_new_process_cannot_start(self):
+        with patch('macast.utils.cherrypy.engine.publish', return_value=[]), \
+                patch('macast.utils.Setting.stop_service'), \
+                patch('macast.utils.subprocess.Popen', side_effect=OSError('cannot spawn')), \
+                patch('macast.utils.cherrypy.engine.restart') as restart, \
+                patch('macast.utils.os._exit') as exit_process:
+            Setting._restart_application()
+        restart.assert_called_once_with()
+        exit_process.assert_not_called()
+
+    def test_restart_stops_the_renderer_before_restarting(self):
+        # 否则旧的 mpv 子进程会变成孤儿留在后台（每次安装/卸载插件都会多一个）
+        renderer = Mock()
+        with patch('macast.utils.cherrypy.engine.publish', return_value=[renderer]), \
+                patch('macast.utils.Setting.stop_service'), \
+                patch('macast.utils.subprocess.Popen',
+                      return_value=Mock(poll=Mock(return_value=None))), \
+                patch('macast.utils.time.sleep'), \
+                patch('macast.utils.os._exit'):
+            Setting._restart_application()
+        renderer.stop.assert_called_once_with()
+
+    def test_restart_survives_a_failing_renderer_stop(self):
+        renderer = Mock()
+        renderer.stop.side_effect = RuntimeError('player is stuck')
+        with patch('macast.utils.cherrypy.engine.publish', return_value=[renderer]), \
+                patch('macast.utils.Setting.stop_service'), \
+                patch('macast.utils.subprocess.Popen',
+                      return_value=Mock(poll=Mock(return_value=None))), \
+                patch('macast.utils.time.sleep'), \
+                patch('macast.utils.os._exit') as exit_process:
+            Setting._restart_application()
+        exit_process.assert_called_once_with(0)
 
     def test_restart_application_is_delayed_until_the_response_is_sent(self):
         with patch('macast.utils.threading.Timer') as timer:
