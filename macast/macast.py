@@ -570,7 +570,7 @@ def _load_language():
 
 
 def _set_mpv_default_path():
-    """Use a bundled mpv when present, otherwise the user's PATH."""
+    """Use a bundled mpv when present, otherwise a common install location."""
     root = (sys._MEIPASS if getattr(sys, 'frozen', False)
             and hasattr(sys, '_MEIPASS')
             else os.path.dirname(os.path.dirname(__file__)))
@@ -578,7 +578,17 @@ def _set_mpv_default_path():
               else 'bin/MacOS/mpv' if sys.platform == 'darwin'
               else 'bin/mpv')
     bundled = os.path.join(root, binary)
-    Setting.mpv_default_path = bundled if os.path.isfile(bundled) else 'mpv'
+    if os.path.isfile(bundled):
+        Setting.mpv_default_path = bundled
+        return
+    # A bundle opened from Finder does not inherit the shell PATH, so the usual
+    # package manager locations are checked before falling back to a bare name.
+    for prefix in ('/opt/homebrew/bin', '/usr/local/bin', '/opt/local/bin'):
+        candidate = os.path.join(prefix, 'mpv')
+        if os.path.isfile(candidate):
+            Setting.mpv_default_path = candidate
+            return
+    Setting.mpv_default_path = 'mpv'
 
 
 def gui_entry():
