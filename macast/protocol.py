@@ -19,12 +19,15 @@ from queue import Queue
 from enum import Enum
 
 from .utils import load_xml, XMLPath, Setting, cherrypy_publish, SETTING_DIR, validate_settings
+from .plugin_store import (PluginStoreError, install_plugin, load_repo_plugins,
+                           uninstall_plugin)
 
 logger = logging.getLogger("Protocol")
 logger.setLevel(logging.INFO)
 
 MAX_SOAP_BODY_BYTES = 1024 * 1024
 MAX_SETTINGS_BODY_BYTES = 64 * 1024
+MAX_PLUGIN_REQUEST_BYTES = 4 * 1024
 
 
 def parse_untrusted_xml(data):
@@ -971,6 +974,7 @@ class Handler:
                 'api?query=log': 'get logs of macast',
                 'api?query=launch-param': 'get settings of macast',
                 'api?query=plugin-info': 'get local plugin information',
+                'api?query=plugin-repo': 'list installable plugins of the Macast plugins repo',
                 'api?query=session': 'get a local settings session token',
             }
             if query == 'log':
@@ -991,6 +995,12 @@ class Handler:
                     'version': Setting.version,
                     'plugins': info
                 }
+            elif query == 'plugin-repo':
+                try:
+                    res = load_repo_plugins(force=kwargs.get('refresh') == '1')
+                except PluginStoreError as error:
+                    logger.warning('Cannot load plugin repository: %s', error)
+                    res = {'code': 1, 'message': str(error), 'plugins': []}
             elif query == 'session':
                 res = {'csrf_token': self.csrf_token}
             return json.dumps(res, indent=4).encode()
@@ -1023,10 +1033,53 @@ class Handler:
                 Setting.setting = setting
                 Setting.save()
                 Setting.restart()
+        elif kwargs.get('install-plugin', None) is not None:
+            self.change_plugin(kwargs.get('install-plugin', ''), install_plugin,
+                               {'platform': sys.platform}, res)
+        elif kwargs.get('uninstall-plugin', None) is not None:
+            self.change_plugin(kwargs.get('uninstall-plugin', ''), uninstall_plugin, {}, res)
         else:
             raise cherrypy.HTTPError(400, 'Unsupported local settings action')
 
         return json.dumps(res, indent=4).encode()
+
+    def change_plugin(self, request, action, arguments, res):
+        """Install or remove one plugin and restart Macast to reload the list."""
+        if len(request.encode('utf-8')) > MAX_PLUGIN_REQUEST_BYTES:
+            raise cherrypy.HTTPError(413, 'Plugin request is too large')
+        try:
+            plugin = action(json.loads(request), **arguments)
+        except (TypeError, ValueError) as error:
+            res['code'] = 1
+            res['message'] = '插件描述格式错误（{}）'.format(error)
+            return
+        except PluginStoreError as error:
+            res['code'] = 1
+            res['message'] = str(error)
+            return
+
+        res['message'] = '{} {}，Macast 正在重启以更新插件列表。'.format(
+            plugin['title'], Handler.plugin_action_detail(plugin))
+        res['plugin'] = {
+            'removed': plugin.get('removed', False),
+            'replaced': plugin.get('replaced', False),
+            'title': plugin['title'],
+            'type': plugin['type'],
+            'version': plugin.get('version', ''),
+        }
+        res['restart'] = True
+        cherrypy.engine.publish('app_notify', 'Macast', res['message'])
+        Setting.restart_application()
+
+    @staticmethod
+    def plugin_action_detail(plugin):
+        if plugin.get('removed'):
+            return '已卸载'
+        if plugin.get('replaced') and plugin.get('version'):
+            return '已更新到 v{}'.format(plugin['version'])
+        if plugin.get('version'):
+            return 'v{} 已安装'.format(plugin['version'])
+        return '已安装'
 
 
 @cherrypy.expose

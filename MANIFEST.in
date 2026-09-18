@@ -10,3 +10,4 @@ recursive-include macast/xml *.html
 recursive-include macast/xml *.csv
 recursive-include macast/scripts *.lua
 recursive-include macast/assets *.png *.icns *.ico *.js *.css *.ttf *.woff
+recursive-include plugins *.py *.md *.json

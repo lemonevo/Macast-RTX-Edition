@@ -466,7 +466,14 @@ class Macast(App):
             _("Copy Video URI"),
             key="c",
             callback=lambda _: pyperclip.copy(uri))
-        self.append_menu_item_after(self.toggle_menuitem.id, self.copy_menuitem)
+        # macOS 的 rumps 菜单用 key 索引菜单项，用本地化文本会抛 KeyError；
+        # 插入失败也不能影响播放流程
+        anchor = self.toggle_menuitem.key if self.platform == Platform.Darwin \
+            else self.toggle_menuitem.id
+        try:
+            self.append_menu_item_after(anchor, self.copy_menuitem)
+        except Exception as error:
+            logger.warning(f'Cannot add the copy-uri menu item: {error}')
 
     # The followings are the callback function of menu click
 
@@ -516,7 +523,7 @@ class Macast(App):
             self.notification(_("Error"), _(res[1]))
 
     def on_about_click(self, _):
-        self.open_browser('http://127.0.0.1:{}?page=4'.format(Setting.get_port()))
+        self.open_browser('http://127.0.0.1:{}?page=5'.format(Setting.get_port()))
 
     def on_toggle_service_click(self, item):
         if Setting.is_service_running():

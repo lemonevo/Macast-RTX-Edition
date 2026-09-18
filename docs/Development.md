@@ -113,3 +113,11 @@ uses UDP 1900; the app serves the device description on its configured TCP
 port. Firewalls and Wi-Fi client isolation can prevent discovery even when the
 app starts normally. Logs and settings are in the user configuration directory
 shown by the tray's **Open Config Directory** action.
+
+The local settings page (`http://127.0.0.1:<port>`) is loopback-only. Its
+**Plugins** tab lists the plugin source in `plugins/` (this repository's mirror of
+`xfangfang/Macast-plugins` plus local patches) through
+`macast/plugin_store.py` and installs the selected file into
+`<config dir>/renderer` or `<config dir>/protocol`. Installing restarts the
+whole application, because plugins are imported during startup; confirm the new
+entry in the tray menu afterwards.

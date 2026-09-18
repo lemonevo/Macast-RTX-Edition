@@ -19,6 +19,6 @@ Include:
 
 - DLNA control traffic is accepted from the local network because that is required for a Media Renderer.
 - The settings page, settings API, logs, and component inventory are restricted to loopback clients and use a per-process CSRF token.
-- Automatic remote plugin installation is intentionally unavailable.
-- Files placed manually in the local `renderer` or `protocol` plugin directory are executable Python code and have the same permissions as the application. Only install reviewed plugins from trusted sources.
+- Plugin installation is only reachable from that same loopback-only settings session and additionally requires the CSRF token. Downloads are limited to `.py` files hosted in this repository's `plugins/` directory or the upstream `xfangfang/Macast-plugins` repository, size capped, and validated for `<macast.renderer>`/`<macast.protocol>` metadata before they are written to the plugin directory. No other URL is accepted, even if the settings page is compromised.
+- Files in the local `renderer` or `protocol` plugin directory are executable Python code and have the same permissions as the application. Only install reviewed plugins from trusted sources.
 - Cast media URLs may contain temporary tokens or private addresses. Logs and copied playback URLs should be treated as sensitive.

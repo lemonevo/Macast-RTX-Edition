@@ -5,6 +5,7 @@ import sys
 import uuid
 import json
 import time
+import threading
 import ctypes
 import logging
 import platform
@@ -458,6 +459,40 @@ class Setting:
             executable = sys.executable
             os.execve(executable, [executable, executable], env)
         else:
+            cherrypy.engine.restart()
+
+    @staticmethod
+    def application_command():
+        """Return the executable and arguments that start Macast again."""
+        executable = sys.executable
+        if sys.platform == 'darwin' and executable.endswith("Contents/MacOS/python"):
+            # run from py2app build: the app executable launches the interpreter
+            app = executable[:-len('python')] + 'Macast'
+            return app, [app, app]
+        if getattr(sys, 'frozen', False):
+            # run from a bundle: the executable is the entry point
+            return executable, [executable] + sys.argv[1:]
+        return executable, [executable, sys.argv[0]] + sys.argv[1:]
+
+    @staticmethod
+    def restart_application(delay=2.0):
+        """Restart the whole application, for example after installing a plugin.
+
+        Plugins are imported while Macast starts, so a plain service restart
+        does not pick them up. The restart is delayed to let the HTTP response
+        reach the settings page first. Current playback and DLNA sessions end.
+        """
+        threading.Timer(delay, Setting._restart_application).start()
+
+    @staticmethod
+    def _restart_application():
+        """Replace the running process with a fresh one."""
+        logger.info('Restarting Macast to load new components')
+        executable, arguments = Setting.application_command()
+        try:
+            os.execv(executable, arguments)
+        except OSError:
+            logger.exception('Cannot restart Macast, restarting the service instead')
             cherrypy.engine.restart()
 
 

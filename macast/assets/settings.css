@@ -239,6 +239,84 @@ h2 {
     font-size: 0.78rem;
 }
 
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+button:disabled:hover {
+    filter: none;
+}
+
+code {
+    padding: 0.1rem 0.35rem;
+    border-radius: 0.35rem;
+    color: #d9f7ab;
+    background: #070a0c;
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 0.86em;
+}
+
+.plugin-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+}
+
+.plugin-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 1.15rem;
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+    background: var(--surface-raised);
+}
+
+.plugin-card header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.plugin-card p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.7;
+}
+
+.plugin-card small {
+    color: var(--muted);
+    font-family: "Cascadia Code", Consolas, monospace;
+}
+
+.plugin-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: auto;
+}
+
+.plugin-actions button {
+    padding: 0.5rem 0.95rem;
+    font-size: 0.85rem;
+}
+
+.plugin-buttons {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.plugin-state {
+    color: var(--muted);
+    font-family: "Cascadia Code", Consolas, monospace;
+    font-size: 0.85rem;
+}
+
 label {
     display: block;
     margin: 2rem 0 0.6rem;
@@ -339,7 +417,8 @@ footer {
     }
 
     .feature-grid,
-    .component-list {
+    .component-list,
+    .plugin-list {
         grid-template-columns: 1fr;
     }
 

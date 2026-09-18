@@ -109,7 +109,10 @@ class Service:
             '/assets': {
                 'tools.staticdir.root': XMLPath.BASE_PATH.value,
                 'tools.staticdir.on': True,
-                'tools.staticdir.dir': "assets"
+                'tools.staticdir.dir': "assets",
+                # 设置页的 JS/CSS 改动后让浏览器每次都校验，避免用到旧缓存
+                'tools.response_headers.on': True,
+                'tools.response_headers.headers': [('Cache-Control', 'no-cache')]
             },
             '/': {
                 'request.dispatch': cherrypy.dispatch.MethodDispatcher(),

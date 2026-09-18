@@ -22,6 +22,7 @@
 - 接收 DLNA 控制端发送的视频、音频和图片地址，支持播放、暂停、音量和进度控制。
 - 使用 mpv 播放，可从托盘菜单调整窗口大小、位置、置顶和硬件解码。
 - 提供本机设置页、运行日志和自定义 Renderer、Protocol、mpv 脚本支持。
+- 设置页可从本仓库 [`plugins/`](plugins/README.md) 插件源一键安装 Renderer、Protocol 插件（镜像上游并带本地修复）。
 
 ## 快速开始
 
@@ -106,6 +107,16 @@ VSR 仅在视频被放大时生效。RTX Video HDR 还需要 HDR 显示器以及
 | Linux | `~/.config/Macast-RTX-Edition` |
 
 完整的三平台依赖、Windows EXE、Linux 单文件构建和翻译命令见[中文构建指南](docs/Build_ZH.md)；开发细节见[英文开发文档](docs/Development.md)。自定义 Renderer、Protocol 和 mpv 脚本会以当前用户权限运行，请只加载可信代码。
+
+### 插件
+
+托盘菜单中的 `Advanced Setting` → 设置页「插件」标签会列出**本仓库 [`plugins/`](plugins/README.md) 插件源**（[`plugins/info.json`](plugins/info.json)）里的 Renderer 和 Protocol 插件 —— 即上游 [xfangfang/Macast-plugins](https://github.com/xfangfang/Macast-plugins) 的镜像 **加上本仓库维护的修复版**（如「哔哩哔哩投屏（Bilibili 投屏）」）。点击「安装」即可下载，已安装的插件可在同一张卡片上「卸载」；两者完成后 Macast 都会自动重启以更新插件列表（当前投屏会中断），随后在托盘菜单的 `Renderers` / `Protocols` 里启用。安装和卸载只作用于白名单仓库中的 `.py` 文件（本仓库与上游插件仓库），并且只在能从本机访问设置页、且持有当前会话令牌时可用。
+
+也可以手动安装：把插件 `.py` 放进上述配置目录的 `renderer/` 或 `protocol/` 子目录（托盘菜单 `Open Config Directory` 可直接打开），然后重启 Macast。注意插件可能只支持部分平台（例如 PotPlayer 插件仅 Windows、IINA 插件仅 macOS），插件所需的播放器或依赖要自行安装。
+
+### 本仓库维护的插件
+
+[`plugins/`](plugins/README.md) 是本仓库的插件源，插件商店默认从这里拉取。其中 [`plugins/nirvana.py`](plugins/README.md)（显示名 **哔哩哔哩投屏（Bilibili 投屏）**，原名 NVA Protocol）是 B 站投屏协议插件的本地维护副本，修复了弹幕状态不同步、弹幕文件互相覆盖、切换分辨率后弹幕消失、高画质无声、画质列表缺失等问题，并改为优先使用 DASH 取流（1080P 只能通过 DASH 提供，音轨由 `audio-add` 挂载），FLV 合并流作为回退。修改清单和排查方法见 [plugins/README.md](plugins/README.md)。
 
 ## 来源、许可证与感谢
 

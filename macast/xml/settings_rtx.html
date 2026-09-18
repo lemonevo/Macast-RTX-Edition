@@ -28,9 +28,10 @@
 
     <nav class="tabs" aria-label="设置页导航">
         <button type="button" data-page="1">概览</button>
-        <button type="button" data-page="2">高级设置</button>
-        <button type="button" data-page="3">日志</button>
-        <button type="button" data-page="4">帮助</button>
+        <button type="button" data-page="2">插件</button>
+        <button type="button" data-page="3">高级设置</button>
+        <button type="button" data-page="4">日志</button>
+        <button type="button" data-page="5">帮助</button>
     </nav>
 
     <main>
@@ -49,7 +50,7 @@
                 <article class="feature">
                     <span class="feature-index">03</span>
                     <h2>本机管理</h2>
-                    <p>设置、日志与插件信息只允许从本机访问。远程下载并执行插件的旧入口已经移除。</p>
+                    <p>设置、日志与插件只允许从本机访问，并需要本机设置页的会话令牌。插件来自本仓库 plugins 目录（镜像上游并带本地修复），安装后即以当前用户权限运行。</p>
                 </article>
             </div>
 
@@ -66,6 +67,28 @@
         <section class="panel" data-panel="2" hidden>
             <div class="section-heading">
                 <div>
+                    <p class="eyebrow">PLUGINS</p>
+                    <h2>插件</h2>
+                </div>
+                <div class="actions">
+                    <span class="local-badge">仅限本机</span>
+                    <button type="button" class="secondary" id="refresh-plugins">刷新列表</button>
+                </div>
+            </div>
+            <p class="muted">插件来自
+                <a id="plugin-repo-link" href="https://github.com/lemonevo/Macast-RTX-Edition/tree/main/plugins" target="_blank" rel="noreferrer">本仓库的插件源</a>（镜像 xfangfang/Macast-plugins 并包含本地修复）。
+                安装会把对应的 Python 文件写入本机插件目录（<code>renderer/</code> 或 <code>protocol/</code>），已安装的插件可直接在卡片上卸载。
+                安装或卸载后 Macast 都会自动重启以更新插件列表（当前投屏会中断），随后可在托盘菜单的 Renderers / Protocols 中启用。插件以当前用户权限运行，只安装你信任的插件。
+            </p>
+            <div class="actions">
+                <span id="plugin-message" class="message" role="status">正在读取插件列表……</span>
+            </div>
+            <div id="plugin-list" class="plugin-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel" data-panel="3" hidden>
+            <div class="section-heading">
+                <div>
                     <p class="eyebrow">ADVANCED</p>
                     <h2>高级设置</h2>
                 </div>
@@ -80,7 +103,7 @@
             </div>
         </section>
 
-        <section class="panel" data-panel="3" hidden>
+        <section class="panel" data-panel="4" hidden>
             <div class="section-heading">
                 <div>
                     <p class="eyebrow">DIAGNOSTICS</p>
@@ -91,7 +114,7 @@
             <pre id="log-output" tabindex="0">正在读取日志……</pre>
         </section>
 
-        <section class="panel help" data-panel="4" hidden>
+        <section class="panel help" data-panel="5" hidden>
             <p class="eyebrow">QUICK START</p>
             <h2>使用说明</h2>
             <ol>
@@ -100,6 +123,7 @@
                 <li>在任意兼容的 DLNA 控制端点击投放，选择名称中带有 <code>Macast RTX</code> 的设备。</li>
                 <li>程序会检测显卡并设置 RTX 功能的默认状态，也可通过托盘菜单分别关闭 VSR 和 HDR。</li>
                 <li>在 NVIDIA App 的“系统 → 视频”中确认增强状态是否处于活动。</li>
+                <li>需要更多播放器支持时，在设置页“插件”标签里安装 Renderer 或 Protocol 插件（清单来自本仓库的 plugins 目录），Macast 会自动重启，随后在托盘菜单中启用。</li>
             </ol>
             <div class="notice">
                 <strong>HDR 前置条件</strong>
