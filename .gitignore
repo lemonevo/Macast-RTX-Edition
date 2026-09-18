@@ -133,3 +133,6 @@ dmypy.json
 .build/
 bin
 mpv-latest.tar.gz
+
+# macOS
+.DS_Store
